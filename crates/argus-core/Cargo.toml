@@ -18,6 +18,9 @@ pulldown-cmark = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
 sqlx = { workspace = true }
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
+blake3 = { workspace = true }

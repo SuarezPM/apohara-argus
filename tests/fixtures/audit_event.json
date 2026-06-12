@@ -1,0 +1,20 @@
+{
+  "audit_id": "00000000-0000-0000-0000-000000000001",
+  "timestamp": "2026-06-12T19:00:00Z",
+  "model_id": "deepseek-ai/deepseek-v4-flash",
+  "prompt_template_version": "abc123",
+  "prompt_fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+  "response_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111",
+  "temperature": 0.7,
+  "tool_calls": [],
+  "input_tokens": 100,
+  "output_tokens": 50,
+  "estimated_cost_usd": 0.0,
+  "decision": {
+    "verdict": "warn",
+    "findings_count": 2,
+    "rationale": "Two minor slop patterns detected"
+  },
+  "prev_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+  "signature": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+}

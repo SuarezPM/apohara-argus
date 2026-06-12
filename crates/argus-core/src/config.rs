@@ -14,6 +14,11 @@ pub struct Config {
     pub api_port: u16,
     pub dashboard_port: u16,
     pub log_level: String,
+    /// Retention window in days for the Article 12 audit log (Roadmap 2.2
+    /// NDJSON exporter prunes entries older than this). Default 365 days
+    /// (1 year) — enough for most enterprise review cycles, well within
+    /// EU AI Act's "throughout the lifecycle" obligation.
+    pub retention_days: u32,
 }
 
 impl Config {
@@ -33,6 +38,8 @@ impl Config {
             dashboard_port: env::var("ARGUS_DASHBOARD_PORT")
                 .ok().and_then(|s| s.parse().ok()).unwrap_or(3000),
             log_level: env::var("ARGUS_LOG").unwrap_or_else(|_| "info".into()),
+            retention_days: env::var("ARGUS_RETENTION_DAYS")
+                .ok().and_then(|s| s.parse().ok()).unwrap_or(365),
         })
     }
 
@@ -83,5 +90,26 @@ mod tests {
         if let Some(v) = prev { std::env::set_var("ARGUS_NIM_BASE_URL", v); }
         assert!(!c.nim_base_url.is_empty());
         assert!(c.api_port > 0);
+    }
+
+    #[test]
+    fn retention_days_default_and_env_override() {
+        // Default: 365 when env not set.
+        let prev = std::env::var("ARGUS_RETENTION_DAYS").ok();
+        std::env::remove_var("ARGUS_RETENTION_DAYS");
+        let c = Config::from_env().expect("load");
+        assert_eq!(c.retention_days, 365);
+        if let Some(v) = prev { std::env::set_var("ARGUS_RETENTION_DAYS", v); }
+
+        // Env override: 90.
+        // SAFETY: single-threaded test.
+        let prev2 = std::env::var("ARGUS_RETENTION_DAYS").ok();
+        std::env::set_var("ARGUS_RETENTION_DAYS", "90");
+        let c = Config::from_env().expect("load");
+        match prev2 {
+            Some(v) => std::env::set_var("ARGUS_RETENTION_DAYS", v),
+            None => std::env::remove_var("ARGUS_RETENTION_DAYS"),
+        }
+        assert_eq!(c.retention_days, 90);
     }
 }

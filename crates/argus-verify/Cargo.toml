@@ -30,6 +30,7 @@ anyhow = { workspace = true }
 thiserror = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
+hex = { workspace = true }
 
 [dev-dependencies]
 # Used by `tests/shutdown.rs` to deliver SIGTERM/SIGINT to the test

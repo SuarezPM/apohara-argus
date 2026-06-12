@@ -9,13 +9,14 @@
 //! and set a label on the PR.
 
 use argus_core::{ArgusError, PRReview, Verdict, VerdictStatus, RiskScore};
-use argus_crypto::chain::{append, GENESIS_HASH};
+use argus_crypto::chain::append;
 use argus_crypto::identity::AgentKeypair;
 use argus_github::GitHubClient;
 use argus_llm::{ModelRegistry, ModelRole, NimClient};
 use argus_slop::pipeline::AnalysisPipeline;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
 pub mod shutdown;
@@ -51,7 +52,21 @@ pub struct VerifyWorker {
     pub nim: NimClient,
     pub nim_model: String,
     pub github: Option<GitHubClient>,
+    /// Per-worker session-scoped hash chain. Each `analyze()` call reads
+    /// this, uses it as the `prev_hash` for the PRReview ledger entry,
+    /// then advances it to the new entry's hash. Starts at GENESIS.
+    ///
+    /// Replaces the previous design where every request reset `prev_hash`
+    /// to `argus_crypto::chain::GENESIS_HASH` — that made every review
+    /// look like the first link in a new chain and broke tamper-evidence
+    /// across requests handled by the same worker process.
+    pub prev_hash: Arc<Mutex<[u8; 32]>>,
 }
+
+/// Genesis prev_hash for the per-`VerifyWorker` session chain.
+/// Mirrors `argus_crypto::chain::GENESIS_HASH` but as a raw `[u8; 32]`
+/// so we can store it in an `Arc<Mutex<…>>` without going through hex.
+const WORKER_GENESIS: [u8; 32] = [0u8; 32];
 
 impl VerifyWorker {
     pub fn new(nim_key: &str) -> Self {
@@ -59,6 +74,7 @@ impl VerifyWorker {
             nim: NimClient::new(),
             nim_model: ModelRegistry::default_for_role(ModelRole::Verdict),
             github: None,
+            prev_hash: Arc::new(Mutex::new(WORKER_GENESIS)),
         }
     }
 
@@ -107,10 +123,19 @@ impl VerifyWorker {
         let sec_sum = out.security.as_ref()
             .map(|s| format!("{} findings, highest {:?}", s.findings.len(), s.highest_severity));
 
-        // Build the signed review (for the audit trail)
+        // Build the signed review (for the audit trail).
+        //
+        // The PRReview ledger prev_hash is the per-worker session hash,
+        // not the per-request GENESIS. This makes the chain tamper-evident
+        // across requests handled by the same worker process — the
+        // previous implementation reset to GENESIS every request, which
+        // broke the chain.
         let pr_commit = "fetched-at-runtime".to_string(); // simplified
         let agent = AgentKeypair::generate("aegis-verdict");
-        let prev_hash = GENESIS_HASH.to_string();
+        let prev_hash: String = {
+            let guard = self.prev_hash.lock().expect("prev_hash mutex poisoned");
+            hex::encode(*guard)
+        };
         let payload = serde_json::json!({
             "pr_ref": &pr_ref,
             "verdict_status": format!("{:?}", out.verdict.status),
@@ -118,6 +143,17 @@ impl VerifyWorker {
             "timestamp": Utc::now().to_rfc3339(),
         });
         let entry = append(&prev_hash, &payload);
+
+        // Advance the per-worker session chain: next prev_hash is this
+        // entry's hash, decoded from the hex the ledger produced.
+        {
+            let new_prev: [u8; 32] = hex::decode(&entry.hash)
+                .expect("ledger hash is hex")
+                .try_into()
+                .expect("ledger hash is 32 bytes");
+            *self.prev_hash.lock().expect("prev_hash mutex poisoned") = new_prev;
+        }
+
         let review = PRReview {
             id: Uuid::new_v4(),
             pr_ref: pr_ref.clone(),
