@@ -7,7 +7,7 @@
 //! The NIM key is BYOK: pass it in the `X-LLM-Key` header. The server
 //! also accepts ARGUS_NIM_KEY env var as a fallback.
 
-use argus_verify::VerifyWorker;
+use argus_verify::{shutdown_signal, VerifyWorker};
 use axum::{extract::State, http::HeaderMap, response::IntoResponse, routing::{get, post}, Json, Router};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -49,7 +49,9 @@ async fn main() -> anyhow::Result<()> {
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     eprintln!("argus-verify listening on http://{}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
     Ok(())
 }
 
