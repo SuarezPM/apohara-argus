@@ -1,0 +1,10 @@
+[package]
+name = "argus-lens"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "ARGUS crate: argus-lens"
+repository.workspace = true
+
+[dependencies]

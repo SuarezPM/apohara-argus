@@ -1,0 +1,10 @@
+[package]
+name = "argus-verify"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "ARGUS crate: argus-verify"
+repository.workspace = true
+
+[dependencies]

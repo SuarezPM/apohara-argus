@@ -1,0 +1,39 @@
+# Build artifacts
+target/
+**/target/
+**/*.rs.bk
+Cargo.lock.bak
+
+# Secrets — NUNCA commitear
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local data
+data/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+
+# Generated docs
+docs/screenshots/
+docs/screenshots/**/*.png
+docs/screenshots/**/*.jpg
+
+# Deploy artifacts
+deploy/dist/
+deploy/build/

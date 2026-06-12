@@ -1,0 +1,91 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/argus-core",
+  "crates/argus-crypto",
+  "crates/argus-llm",
+  "crates/argus-slop",
+  "crates/argus-github",
+  "crates/argus-guard",
+  "crates/argus-verify",
+  "crates/argus-lens",
+  "crates/argus-agent",
+  "crates/argus-api",
+  "crates/argus-dashboard",
+  "crates/argus-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT"
+authors = ["Apohara <apohara.dev>"]
+description = "ARGUS — AI slop defense layer for the AI-generated code era"
+repository = "https://github.com/SuarezPM/apohara-argus"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+futures = "0.3"
+
+# Web (Axum)
+axum = { version = "0.7", features = ["ws", "macros"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["fs", "cors", "trace"] }
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls", "multipart"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+
+# DB (Supabase = PostgreSQL)
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "macros"] }
+
+# Templating (SSR for dashboard)
+askama = "0.12"
+askama_axum = "0.4"
+
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+
+# Crypto
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+blake3 = "1"
+
+# Util
+anyhow = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+dotenvy = "0.15"
+url = "2"
+base64 = "0.22"
+hex = "0.4"
+rand = "0.8"
+
+# Markdown parsing (para los prompts .md)
+pulldown-cmark = "0.10"
+
+# Plotting (slop radar SVG generation, fallback si no hay DALL-E)
+plotters = "0.3"
+
+# Internal crate deps
+argus-core = { path = "crates/argus-core" }
+argus-crypto = { path = "crates/argus-crypto" }
+argus-llm = { path = "crates/argus-llm" }
+argus-slop = { path = "crates/argus-slop" }
+argus-github = { path = "crates/argus-github" }
+argus-agent = { path = "crates/argus-agent" }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

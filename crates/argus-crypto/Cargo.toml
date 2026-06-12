@@ -1,0 +1,10 @@
+[package]
+name = "argus-crypto"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "ARGUS crate: argus-crypto"
+repository.workspace = true
+
+[dependencies]

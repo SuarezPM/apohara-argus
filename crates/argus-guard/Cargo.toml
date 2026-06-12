@@ -1,0 +1,10 @@
+[package]
+name = "argus-guard"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "ARGUS crate: argus-guard"
+repository.workspace = true
+
+[dependencies]
