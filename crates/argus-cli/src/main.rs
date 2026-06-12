@@ -190,6 +190,13 @@ async fn main() -> ExitCode {
         }
         Cmd::Health => {
             use argus_llm::LlmClient;
+            // Article 19 retention surfacing (Roadmap 2.4): cheap, instant
+            // feedback on the configured audit retention window. Print
+            // before the NIM round-trip so the line is visible even if the
+            // network call hangs or fails.
+            let config = argus_core::config::Config::from_env()
+                .expect("config: from_env only fails on dotenv I/O, never on defaults");
+            eprintln!("{}", format_retention_line(config.retention_days));
             let client = argus_llm::NimClient::new();
             eprintln!("→ Testing NIM connectivity...");
             let resp = client.complete_one_shot(
@@ -212,5 +219,63 @@ async fn main() -> ExitCode {
                 Err(e) => { eprintln!("✗ NIM failed: {}", e); ExitCode::from(2) }
             }
         }
+    }
+}
+
+/// Render the retention-policy line for `argus health`.
+///
+/// Article 19 of the EU AI Act requires logging "throughout the lifecycle"
+/// of high-risk AI systems. Internally ARGUS treats 180 days as the minimum
+/// acceptable retention window; anything below that gets the warning glyph.
+fn format_retention_line(days: u32) -> String {
+    if days >= 180 {
+        format!("✓ Retention {}d (≥ 180d Article 19 minimum)", days)
+    } else {
+        format!("⚠ Retention {}d < Article 19 minimum (180d)", days)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::format_retention_line;
+
+    #[test]
+    fn happy_default_above_minimum() {
+        assert_eq!(
+            format_retention_line(365),
+            "✓ Retention 365d (≥ 180d Article 19 minimum)"
+        );
+    }
+
+    #[test]
+    fn edge_exactly_at_minimum_is_ok() {
+        assert_eq!(
+            format_retention_line(180),
+            "✓ Retention 180d (≥ 180d Article 19 minimum)"
+        );
+    }
+
+    #[test]
+    fn edge_just_below_minimum_warns() {
+        assert_eq!(
+            format_retention_line(179),
+            "⚠ Retention 179d < Article 19 minimum (180d)"
+        );
+    }
+
+    #[test]
+    fn edge_short_retention_warns() {
+        assert_eq!(
+            format_retention_line(30),
+            "⚠ Retention 30d < Article 19 minimum (180d)"
+        );
+    }
+
+    #[test]
+    fn regression_zero_days_warns() {
+        assert_eq!(
+            format_retention_line(0),
+            "⚠ Retention 0d < Article 19 minimum (180d)"
+        );
     }
 }
