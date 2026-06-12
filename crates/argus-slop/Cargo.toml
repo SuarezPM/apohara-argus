@@ -4,7 +4,22 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "ARGUS crate: argus-slop"
+description = "ARGUS crate: argus-slop — the 4 analyzers (slop/security/arch/verdict)"
 repository.workspace = true
 
 [dependencies]
+argus-core = { workspace = true }
+argus-llm = { workspace = true }
+argus-crypto = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+
+[dev-dependencies]
+tokio = { workspace = true }
+serde_json = { workspace = true }
