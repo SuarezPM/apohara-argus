@@ -10,7 +10,6 @@ members = [
   "crates/argus-verify",
   "crates/argus-lens",
   "crates/argus-agent",
-  "crates/argus-api",
   "crates/argus-dashboard",
   "crates/argus-cli",
 ]
