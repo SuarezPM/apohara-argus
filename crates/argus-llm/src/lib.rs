@@ -18,9 +18,12 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use thiserror::Error;
 
+pub mod model_registry;
 pub mod nim;
 pub mod openai_compat;
 pub mod mock;
+
+pub use model_registry::{ModelRegistry, ModelRole};
 
 #[cfg(feature = "dalle")]
 pub mod dalle;

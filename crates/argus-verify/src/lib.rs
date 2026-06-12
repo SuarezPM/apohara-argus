@@ -12,11 +12,14 @@ use argus_core::{ArgusError, PRReview, Verdict, VerdictStatus, RiskScore};
 use argus_crypto::chain::{append, GENESIS_HASH};
 use argus_crypto::identity::AgentKeypair;
 use argus_github::GitHubClient;
-use argus_llm::NimClient;
+use argus_llm::{ModelRegistry, ModelRole, NimClient};
 use argus_slop::pipeline::AnalysisPipeline;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+pub mod shutdown;
+pub use shutdown::shutdown_signal;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnalyzeRequest {
@@ -54,7 +57,7 @@ impl VerifyWorker {
     pub fn new(nim_key: &str) -> Self {
         Self {
             nim: NimClient::new(),
-            nim_model: "meta/llama-3.1-70b-instruct".to_string(),
+            nim_model: ModelRegistry::default_for_role(ModelRole::Verdict),
             github: None,
         }
     }
