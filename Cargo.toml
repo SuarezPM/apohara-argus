@@ -82,6 +82,9 @@ argus-crypto = { path = "crates/argus-crypto" }
 argus-llm = { path = "crates/argus-llm" }
 argus-slop = { path = "crates/argus-slop" }
 argus-github = { path = "crates/argus-github" }
+argus-guard = { path = "crates/argus-guard" }
+argus-verify = { path = "crates/argus-verify" }
+argus-lens = { path = "crates/argus-lens" }
 argus-agent = { path = "crates/argus-agent" }
 
 [profile.release]
