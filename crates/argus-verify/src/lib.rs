@@ -1,14 +1,180 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+//! argus-verify — Aegis Verify, the PR review worker
+//!
+//! HTTP server that exposes:
+//! - `POST /analyze`   — analyze a PR URL, return verdict
+//! - `GET  /health`    — health check
+//!
+//! The user provides their NIM key in the `X-LLM-Key` header (BYOK).
+//! If a GitHub token is configured, the worker will also post a comment
+//! and set a label on the PR.
+
+use argus_core::{ArgusError, PRReview, Verdict, VerdictStatus, RiskScore};
+use argus_crypto::chain::{append, GENESIS_HASH};
+use argus_crypto::identity::AgentKeypair;
+use argus_github::GitHubClient;
+use argus_llm::NimClient;
+use argus_slop::pipeline::AnalysisPipeline;
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalyzeRequest {
+    pub pr_url: String,
+    /// Optional repository context (sample of files) for the arch fit check.
+    #[serde(default)]
+    pub repo_context: Option<String>,
+    /// If true, post a comment to the PR.
+    #[serde(default)]
+    pub post_comment: bool,
+    /// If true, set labels on the PR.
+    #[serde(default)]
+    pub set_labels: bool,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalyzeResponse {
+    pub pr_ref: String,
+    pub verdict: Verdict,
+    pub slop_score: Option<f32>,
+    pub fit_score: Option<f32>,
+    pub security_summary: Option<String>,
+    pub review: PRReview,
+    pub comment_posted: bool,
+    pub labels_set: bool,
+}
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+pub struct VerifyWorker {
+    pub nim: NimClient,
+    pub nim_model: String,
+    pub github: Option<GitHubClient>,
+}
+
+impl VerifyWorker {
+    pub fn new(nim_key: &str) -> Self {
+        Self {
+            nim: NimClient::new(),
+            nim_model: "meta/llama-3.1-70b-instruct".to_string(),
+            github: None,
+        }
+    }
+
+    pub fn with_model(mut self, m: impl Into<String>) -> Self {
+        self.nim_model = m.into();
+        self.nim = NimClient::new().with_model(self.nim_model.clone());
+        self
+    }
+
+    pub fn with_github(mut self, client: GitHubClient) -> Self {
+        self.github = Some(client);
+        self
+    }
+
+    /// Process a PR review request end-to-end.
+    pub async fn analyze(
+        &self,
+        request: AnalyzeRequest,
+    ) -> Result<AnalyzeResponse, ArgusError> {
+        // Parse the PR URL
+        let (owner, repo, number) = GitHubClient::parse_pr_url(&request.pr_url)
+            .map_err(|e| ArgusError::InvalidInput(format!("invalid PR URL: {}", e)))?;
+        let pr_ref = format!("{}/{}/pull/{}", owner, repo, number);
+
+        // Fetch the diff (if we have a GitHub client)
+        let diff = if let Some(gh) = &self.github {
+            gh.get_diff(&owner, &repo, number).await
+                .map_err(|e| ArgusError::Internal(format!("github diff fetch: {}", e)))?
+        } else {
+            return Err(ArgusError::InvalidInput(
+                "No GitHub client configured; cannot fetch diff. Provide GITHUB_TOKEN.".into()
+            ));
+        };
+
+        // Run the analysis pipeline
+        let pipeline = AnalysisPipeline::new();
+        // BYOK: the worker doesn't have the key here; the caller must have already
+        // set it via env. For simplicity, we expect ARGUS_NIM_KEY to be set.
+        let nim_key = std::env::var("ARGUS_NIM_KEY")
+            .map_err(|_| ArgusError::Internal("ARGUS_NIM_KEY not set on server (BYOK required in X-LLM-Key header — server has fallback env)".into()))?;
+        let out = pipeline.run(&self.nim, &pr_ref, &diff, request.repo_context.as_deref(), &nim_key).await;
+
+        let risk = out.verdict.risk_score.as_f32();
+        let slop_score = out.slop.as_ref().map(|s| s.slop_score);
+        let fit_score = out.architecture.as_ref().map(|a| a.fit_score);
+        let sec_sum = out.security.as_ref()
+            .map(|s| format!("{} findings, highest {:?}", s.findings.len(), s.highest_severity));
+
+        // Build the signed review (for the audit trail)
+        let pr_commit = "fetched-at-runtime".to_string(); // simplified
+        let agent = AgentKeypair::generate("aegis-verdict");
+        let prev_hash = GENESIS_HASH.to_string();
+        let payload = serde_json::json!({
+            "pr_ref": &pr_ref,
+            "verdict_status": format!("{:?}", out.verdict.status),
+            "risk_score": risk,
+            "timestamp": Utc::now().to_rfc3339(),
+        });
+        let entry = append(&prev_hash, &payload);
+        let review = PRReview {
+            id: Uuid::new_v4(),
+            pr_ref: pr_ref.clone(),
+            pr_commit_hash: pr_commit,
+            verdict: out.verdict.clone(),
+            findings: vec![], // simplified for now
+            agent_chain: vec![argus_core::AgentAction {
+                agent: argus_core::AgentRole::AegisVerdict,
+                spiffe_id: agent.spiffe_id.as_str().to_string(),
+                action: "VERDICT_EMITTED".to_string(),
+                timestamp: Utc::now(),
+                ed25519_sig: "see-ledger".to_string(), // simplified
+                payload_hash: entry.hash.clone(),
+            }],
+            created_at: Utc::now(),
+            ledger_signature: entry.hash.clone(),
+            prev_ledger_hash: prev_hash,
+        };
+
+        // Optionally post to GitHub
+        let mut comment_posted = false;
+        let mut labels_set = false;
+        if let Some(gh) = &self.github {
+            if request.post_comment {
+                let body = GitHubClient::format_verdict_comment(
+                    &pr_ref,
+                    &format!("{:?}", out.verdict.status),
+                    risk,
+                    &out.verdict.summary,
+                    &out.verdict.key_findings,
+                    &out.verdict.action_items,
+                    slop_score.unwrap_or(0.5),
+                    fit_score.unwrap_or(0.5),
+                    sec_sum.as_deref().unwrap_or("n/a"),
+                );
+                if let Ok(_id) = gh.post_comment(&owner, &repo, number, &body).await {
+                    comment_posted = true;
+                }
+            }
+            if request.set_labels {
+                let label = match out.verdict.status {
+                    VerdictStatus::Approved => "argus/approved",
+                    VerdictStatus::ReviewRequired => "argus/needs-review",
+                    VerdictStatus::Halted => "argus/halted",
+                };
+                if gh.set_labels(&owner, &repo, number, &[label]).await.is_ok() {
+                    labels_set = true;
+                }
+            }
+        }
+
+        Ok(AnalyzeResponse {
+            pr_ref,
+            verdict: out.verdict,
+            slop_score,
+            fit_score,
+            security_summary: sec_sum,
+            review,
+            comment_posted,
+            labels_set,
+        })
     }
 }
