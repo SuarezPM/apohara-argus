@@ -1,25 +1,33 @@
 //! argus-verify — Aegis Verify, the PR review worker
 //!
 //! HTTP server that exposes:
-//! - `POST /analyze`   — analyze a PR URL, return verdict
-//! - `GET  /health`    — health check
+//! - `POST /analyze`        — analyze a PR URL, return verdict
+//! - `GET  /health`         — health check
+//! - `GET  /audit/export`   — NDJSON stream of Article 12 audit events
+//!                            (Roadmap 2.2), with a manifest footer.
 //!
 //! The user provides their NIM key in the `X-LLM-Key` header (BYOK).
 //! If a GitHub token is configured, the worker will also post a comment
 //! and set a label on the PR.
 
-use argus_core::{ArgusError, PRReview, Verdict, VerdictStatus, RiskScore};
+use argus_core::{ArgusError, DecisionArtifact, PRReview, Verdict, VerdictStatus, RiskScore};
 use argus_crypto::chain::append;
 use argus_crypto::identity::AgentKeypair;
 use argus_github::GitHubClient;
-use argus_llm::{ModelRegistry, ModelRole, NimClient};
+use argus_llm::{audit, ModelRegistry, ModelRole, NimClient};
 use argus_slop::pipeline::AnalysisPipeline;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
+pub mod audit_store;
+pub mod cache;
+pub mod routes;
 pub mod shutdown;
+pub use audit_store::InMemoryAuditStore;
+pub use cache::IdempotencyCache;
+pub use routes::audit_export_handler;
 pub use shutdown::shutdown_signal;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,6 +69,24 @@ pub struct VerifyWorker {
     /// look like the first link in a new chain and broke tamper-evidence
     /// across requests handled by the same worker process.
     pub prev_hash: Arc<Mutex<[u8; 32]>>,
+    /// In-memory audit-event log backing the NDJSON export endpoint
+    /// (`GET /audit/export`, Roadmap 2.2). Cloning is cheap — both the
+    /// worker (writer, via `analyze()`) and the HTTP route (reader, via
+    /// `audit_export_handler`) hold clones that share the same
+    /// `Arc<RwLock<Vec<AuditEvent>>>`.
+    pub audit_store: InMemoryAuditStore,
+    /// Per-worker session-scoped hash chain for the *audit* log
+    /// (separate from `prev_hash`, which is for the PRReview ledger).
+    /// Each `analyze()` call reads this, uses it as the `prev_hash`
+    /// for the emitted `AuditEvent`, then advances it via
+    /// `argus_llm::audit::next_prev_hash`.
+    pub audit_prev_hash: Arc<Mutex<[u8; 32]>>,
+    /// Per-worker ephemeral Ed25519 signing key for audit events.
+    /// In production this would be loaded from a KMS/HSM; for the
+    /// in-memory store (Roadmap 2.2), a fresh key per worker is
+    /// sufficient — the signature proves the event was produced by
+    /// *this* process, not a forger.
+    pub audit_signing_key: ed25519_dalek::SigningKey,
 }
 
 /// Genesis prev_hash for the per-`VerifyWorker` session chain.
@@ -75,6 +101,11 @@ impl VerifyWorker {
             nim_model: ModelRegistry::default_for_role(ModelRole::Verdict),
             github: None,
             prev_hash: Arc::new(Mutex::new(WORKER_GENESIS)),
+            audit_store: InMemoryAuditStore::new(),
+            audit_prev_hash: Arc::new(Mutex::new(WORKER_GENESIS)),
+            audit_signing_key: ed25519_dalek::SigningKey::generate(
+                &mut rand::rngs::OsRng,
+            ),
         }
     }
 

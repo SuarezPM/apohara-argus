@@ -6,16 +6,30 @@
 //!
 //! The NIM key is BYOK: pass it in the `X-LLM-Key` header. The server
 //! also accepts ARGUS_NIM_KEY env var as a fallback.
+//!
+//! Idempotency: if the caller supplies an `X-Idempotency-Key` header,
+//! the server caches the verdict under that key and returns the cached
+//! response on subsequent requests with the same key + same `pr_url`.
+//! See `cache.rs` and item [Refs: 6.2] of the roadmap.
 
-use argus_verify::{shutdown_signal, VerifyWorker};
-use axum::{extract::State, http::HeaderMap, response::IntoResponse, routing::{get, post}, Json, Router};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
+
+use argus_verify::{shutdown_signal, IdempotencyCache, VerifyWorker};
+use axum::{
+    extract::State,
+    http::HeaderMap,
+    response::IntoResponse,
+    routing::{get, post},
+    Json, Router,
+};
 use tracing_subscriber::EnvFilter;
 
 #[derive(Clone)]
 struct AppState {
     worker: Arc<VerifyWorker>,
+    cache: IdempotencyCache,
 }
 
 #[tokio::main]
@@ -39,7 +53,32 @@ async fn main() -> anyhow::Result<()> {
         VerifyWorker::new("")
     };
 
-    let state = AppState { worker: Arc::new(worker) };
+    let cache = IdempotencyCache::new();
+
+    // Background cleanup so the in-memory map cannot grow unboundedly
+    // across long-lived workers. Runs every hour; cheap when the map
+    // is empty. Spawned on the same runtime as the server.
+    {
+        let cache_for_cleanup = cache.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(3600));
+            loop {
+                interval.tick().await;
+                let removed = cache_for_cleanup.cleanup_expired().await;
+                if removed > 0 {
+                    tracing::info!(
+                        removed,
+                        "Cleaned up expired idempotency entries"
+                    );
+                }
+            }
+        });
+    }
+
+    let state = AppState {
+        worker: Arc::new(worker),
+        cache,
+    };
 
     let app = Router::new()
         .route("/health", get(health))
@@ -68,6 +107,29 @@ async fn analyze(
     headers: HeaderMap,
     Json(req): Json<argus_verify::AnalyzeRequest>,
 ) -> Result<Json<argus_verify::AnalyzeResponse>, (axum::http::StatusCode, String)> {
+    // Idempotency: extract the optional key. If present, attempt a
+    // cache hit before running the (expensive) pipeline. The cache
+    // key is the supplied header; the discriminator is `pr_url` —
+    // same key + different PR is a cache miss, by design.
+    let idem_key = headers
+        .get("x-idempotency-key")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
+    if let Some(key) = idem_key.as_deref() {
+        if let Some(cached_body) = state.cache.get(key, &req.pr_url).await {
+            tracing::info!(
+                idempotency_key = %key,
+                pr_url = %req.pr_url,
+                "Returning cached verdict (idempotency hit)"
+            );
+            let resp: argus_verify::AnalyzeResponse = serde_json::from_value(cached_body)
+                .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("cached verdict failed to deserialize: {}", e)))?;
+            return Ok(Json(resp));
+        }
+    }
+
     // BYOK: pull the NIM key from the X-LLM-Key header, fall back to env.
     let nim_key = headers.get("x-llm-key")
         .and_then(|v| v.to_str().ok())
@@ -80,7 +142,26 @@ async fn analyze(
     // (In production we'd pass it through a different mechanism.)
     std::env::set_var("ARGUS_NIM_KEY", &nim_key);
 
-    let resp = state.worker.analyze(req).await
+    let resp = state.worker.analyze(req.clone()).await
         .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, format!("{}", e)))?;
+
+    // Populate the cache only if the caller opted into idempotency.
+    // Failures to serialise for caching are non-fatal — we still
+    // return the freshly-computed verdict.
+    if let Some(key) = idem_key.as_deref() {
+        match serde_json::to_value(&resp) {
+            Ok(body) => {
+                state.cache.put(key.to_string(), req.pr_url, body).await;
+            }
+            Err(e) => {
+                tracing::warn!(
+                    idempotency_key = %key,
+                    error = %e,
+                    "Failed to serialise verdict for idempotency cache; not cached"
+                );
+            }
+        }
+    }
+
     Ok(Json(resp))
 }
