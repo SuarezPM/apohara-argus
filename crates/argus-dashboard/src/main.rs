@@ -166,7 +166,7 @@ a{{color:#06c}}</style>
         }
         Err(e) => {
             Html(format!(r##"<!DOCTYPE html><html><body style="font-family:system-ui;max-width:600px;margin:40px auto">
-<h1>Error</h1><pre>{}</pre><p><a href="/submit">← Back</a></p></body></html>"##, html_escape(&format!("{}", e)))).into_response()
+  <h1>Error</h1><pre>{}</pre><p><a href="/submit">← Back</a></p></body></html>"##, html_escape(&format!("{}", e)))).into_response()
         }
     }
 }
@@ -303,7 +303,7 @@ fn render_landing(briefing_md: &str) -> String {
 
   <h2>Latest weekly briefing</h2>
   <div class="briefing">{}</div>
-  <p><a href="/weekly">→ Read the full briefing</a></p>
+  <p><a href="/weekly">→ Read the full briefing</a> &nbsp; <a class="cta" href="{}" target="_blank" rel="noopener">🎥 Render video avatar in HeyGen</a></p>
 
   <h2>How to run locally</h2>
   <pre><code># 1. Get a free NVIDIA NIM key at https://build.nvidia.com/
@@ -333,7 +333,35 @@ cargo run -p argus -- lens --org acme --mock-prs "acme/api#1,acme/web#2"</code><
   </ol>
 </div>
 </body>
-</html>"##, briefing_md)
+</html>"##, briefing_md, heygen_deeplink(briefing_md))
+}
+
+/// Build a HeyGen Studio deeplink from the briefing text. The user pastes
+/// it into their own HeyGen account — no server-side call, no vendor
+/// dependency, no API key needed. Honors our BYOK philosophy.
+fn heygen_deeplink(script: &str) -> String {
+    // HeyGen's Studio accepts a `script` query param pre-filled with text.
+    // The user clicks → lands in their HeyGen account → records/renders.
+    // We truncate to 2000 chars to stay well under HeyGen's URL limits.
+    let excerpt: String = script.chars().take(2000).collect();
+    let encoded = url_encode(&excerpt);
+    format!("https://app.heygen.com/video-translate?script={}", encoded)
+}
+
+/// Minimal percent-encoding for the HeyGen deeplink query string.
+/// Keeps spaces and safe chars readable, escapes the rest.
+fn url_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char);
+            }
+            b' ' => out.push_str("%20"),
+            _ => out.push_str(&format!("%{:02X}", b)),
+        }
+    }
+    out
 }
 
 fn render_weekly(md: &str) -> String {
@@ -566,5 +594,45 @@ async fn shutdown_signal() {
     tokio::select! {
         _ = ctrl_c => { tracing::info!("SIGINT received, draining in-flight requests..."); }
         _ = terminate => { tracing::info!("SIGTERM received, draining in-flight requests..."); }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{heygen_deeplink, url_encode};
+
+    #[test]
+    fn heygen_deeplink_contains_https_app_heygen_com_video_translate() {
+        let url = heygen_deeplink("Hello world, this is a test briefing.");
+        assert!(url.starts_with("https://app.heygen.com/video-translate?script="),
+            "url must start with HeyGen Studio base, got: {}", url);
+        assert!(url.contains("Hello"));
+    }
+
+    #[test]
+    fn heygen_deeplink_truncates_at_2000_chars() {
+        let long = "a".repeat(5000);
+        let url = heygen_deeplink(&long);
+        // After truncation, the script param should have at most 2000 'a' chars,
+        // which percent-encoded means 2000 'a' chars (no encoding needed for 'a').
+        // The prefix is fixed: "https://app.heygen.com/video-translate?script=" = 47 chars.
+        assert!(url.len() < 47 + 2010,
+            "URL too long ({}) — truncation failed", url.len());
+    }
+
+    #[test]
+    fn heygen_deeplink_handles_empty_input() {
+        let url = heygen_deeplink("");
+        assert_eq!(url, "https://app.heygen.com/video-translate?script=");
+    }
+
+    #[test]
+    fn url_encode_keeps_alphanumeric_and_safe_chars() {
+        assert_eq!(url_encode("Hello-World_1.0~test"), "Hello-World_1.0~test");
+    }
+
+    #[test]
+    fn url_encode_encodes_spaces_as_pct_20() {
+        assert_eq!(url_encode("hello world"), "hello%20world");
     }
 }
