@@ -1,0 +1,93 @@
+# cargo-deny configuration for apohara-argus.
+#
+# The licenses gate is the load-bearing part for v0.1: CI runs
+# `cargo deny check licenses` and FAILS on any dependency license outside the
+# allowlist below (unknown or copyleft). This gates THIRD-PARTY-LICENSES
+# completeness — a new transitive dep with a disallowed license breaks the build
+# rather than silently shipping.
+
+[licenses]
+# Fail (not warn) on any license not explicitly allowed.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-DFS-2016",
+    "Unicode-3.0",
+    "Zlib",
+    # CDLA-Permissive-2.0 is a permissive *data* license (no copyleft, no
+    # source-disclosure obligation) carried by `webpki-roots` for the bundled
+    # Mozilla root-CA store that `ureq`/`reqwest`'s TLS pulls in. Permissive
+    # and shippable.
+    "CDLA-Permissive-2.0",
+    # MPL-2.0 is file-level (weak) copyleft and acceptable for a dynamically/
+    # statically linked dependency without forcing project relicensing. Kept in
+    # the allowlist only because a transitive dep may carry it; remove if
+    # `cargo deny check licenses` shows no MPL-2.0 crate in the tree.
+    "MPL-2.0",
+]
+# Crates with no detectable license expression are a hard error.
+confidence-threshold = 0.9
+
+# Per-crate clarifications can be added here if a crate's license is detected
+# with low confidence but is in fact allowlisted. None needed for v0.1.
+# [[licenses.clarify]]
+# crate = "..."
+# expression = "..."
+# license-files = [{ path = "LICENSE", hash = 0x0 }]
+
+[bans]
+# v0.1 does not gate on duplicate versions or specific bans; the licenses gate
+# is the required one. Multiple-version warnings are advisory.
+multiple-versions = "allow"
+wildcards = "allow"
+
+[advisories]
+# `db-path` defaults to `~/.cargo/advisory-db` (the standard RustSec advisory
+# database cache). If the directory is missing, cargo-deny fetches the latest
+# advisory data from the RustSec git mirror on first run. Override here only
+# for an air-gapped CI that pre-stages the DB at a known path.
+db-path = "~/.cargo/advisory-db"
+# RUSTSEC advisory checks run in CI as advisory (not a hard gate for v0.1);
+# the licenses gate is the required one. Bump to "deny" once an audit cadence
+# is established.
+yanked = "warn"
+# Acknowledged advisories — these are pinned by an MSRV 1.88 / sqlx-0.7
+# dependency constraint we cannot break in S.2 (a sqlx 0.8 upgrade would force
+# rust-version 1.94+, per the root Cargo.toml). Each entry has a written
+# rationale; revisit at the next dependency-review wave.
+ignore = [
+    # paste 1.0.15 (dtolnay/archived 2024) — pulled in transitively by rmcp
+    # (argus-mcp) and sqlx-core. The crate is archived but functional and the
+    # macro_rules! expansion is still correct. `pastey` is a viable drop-in
+    # replacement, but rmcp 0.5's macros are still written against `paste`.
+    "RUSTSEC-2024-0436",
+    # rustls-pemfile 1.0.4 (archived Aug 2025) — pulled in by sqlx-core. The
+    # recommended migration is to depend directly on rustls-pki-types 1.9+,
+    # but that path is owned by the sqlx maintainers, not us. Tracked for
+    # when sqlx 0.8 lands in our tree.
+    "RUSTSEC-2025-0134",
+    # rustls-webpki 0.101.7 (pulled in via sqlx -> rustls 0.21) — three
+    # certificate-name-constraints / CRL-parsing advisories. All require a
+    # misissued CA certificate to be exploitable; ARGUS's TLS endpoints are
+    # to a fixed allowlist (GitHub API, NIM BYOK endpoint, optional Supabase
+    # PostgreSQL) where CA trust is operator-controlled. Fix is in 0.103.12+,
+    # but sqlx 0.7 pins the older rustls 0.21 / webpki 0.101 line.
+    "RUSTSEC-2026-0098",
+    "RUSTSEC-2026-0099",
+    "RUSTSEC-2026-0104",
+    # sqlx 0.7.4 — RUSTSEC-2024-0363 (Postgres binary protocol smuggling via
+    # >4 GiB payloads). Mitigated at the HTTP layer: argus-verify enforces a
+    # request-body size cap via tower-http, so a >4 GiB payload never reaches
+    # the Postgres encoder. Fix is in sqlx 0.8.1+, gated by MSRV 1.88.
+    "RUSTSEC-2024-0363",
+]
+
+[sources]
+# Only crates.io is trusted; a git/path source for a dependency is a hard error
+# (reinforces the no-external-source-coupling invariant).
+unknown-registry = "deny"
+unknown-git = "deny"
