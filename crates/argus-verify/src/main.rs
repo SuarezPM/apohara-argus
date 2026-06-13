@@ -1,8 +1,10 @@
 //! argus-verify HTTP server
 //!
 //! Listens on ARGUS_API_PORT (default 8080). Endpoints:
-//! - POST /analyze   { pr_url, repo_context?, post_comment?, set_labels? }
+//! - POST /analyze        { pr_url, repo_context?, post_comment?, set_labels? }
 //! - GET  /health
+//! - GET  /audit/export   [Refs: 2.2] NDJSON stream of Article 12
+//!                         audit events, with a manifest footer.
 //!
 //! The NIM key is BYOK: pass it in the `X-LLM-Key` header. The server
 //! also accepts ARGUS_NIM_KEY env var as a fallback.
@@ -16,7 +18,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use argus_verify::{shutdown_signal, IdempotencyCache, VerifyWorker};
+use argus_verify::{audit_export_handler, shutdown_signal, IdempotencyCache, VerifyWorker};
 use axum::{
     extract::State,
     http::HeaderMap,
@@ -80,10 +82,19 @@ async fn main() -> anyhow::Result<()> {
         cache,
     };
 
+    // The audit-export route takes its own state (`InMemoryAuditStore`,
+    // not `AppState`), so it lives in a separate sub-router that we
+    // `merge` into the main one.
+    let audit_store = state.worker.audit_store.clone();
+    let audit_router = Router::new()
+        .route("/audit/export", get(audit_export_handler))
+        .with_state(audit_store);
+
     let app = Router::new()
         .route("/health", get(health))
         .route("/analyze", post(analyze))
-        .with_state(state);
+        .with_state(state)
+        .merge(audit_router);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     eprintln!("argus-verify listening on http://{}", addr);

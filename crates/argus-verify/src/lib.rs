@@ -236,6 +236,43 @@ impl VerifyWorker {
             }
         }
 
+        // Emit a single Article 12 audit event summarizing this review
+        // (Roadmap 2.2). The cleartext prompt and response are
+        // consumed by `emit_audit_event` and only their BLAKE3
+        // fingerprints reach the store.
+        let verdict_label = format!("{:?}", out.verdict.status).to_lowercase();
+        let decision = DecisionArtifact {
+            verdict: verdict_label,
+            findings_count: out.verdict.key_findings.len() as u32,
+            rationale: out.verdict.summary.clone(),
+        };
+        let audit_prev = *self
+            .audit_prev_hash
+            .lock()
+            .expect("audit_prev_hash mutex poisoned");
+        let audit_event = audit::emit_audit_event(
+            &self.nim_model,
+            "verify-worker-v1",
+            &diff, // prompt_text — fingerprinted and dropped, never stored
+            &out.verdict.summary, // raw_response — same posture
+            0.7, // temperature — the worker's default for verdict synthesis
+            vec![], // tool_calls — verifier makes no tool calls in this iteration
+            decision,
+            audit_prev,
+            None,
+            None,
+            &self.audit_signing_key,
+        );
+        // Advance the audit chain so the next emission links to this one.
+        *self
+            .audit_prev_hash
+            .lock()
+            .expect("audit_prev_hash mutex poisoned") =
+            audit::next_prev_hash(audit_prev, &audit_event);
+        // Persist. The route reads from this store; the worker is the
+        // sole writer in normal operation.
+        self.audit_store.append(audit_event).await;
+
         Ok(AnalyzeResponse {
             pr_ref,
             verdict: out.verdict,

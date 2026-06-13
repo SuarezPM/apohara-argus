@@ -300,6 +300,29 @@ pub struct AuditEvent {
     #[serde(with = "hex_signature")]
     pub signature: Signature,
 }
+// =====================================================================
+// EU AI Act Article 12 — compliance export manifest (Roadmap 2.2)
+//
+// The `Manifest` is the last line of the NDJSON stream emitted by
+// `GET /audit/export`. It lets an auditor verify the body they hold is
+// the same one we held at export time: re-compute the BLAKE3 hash from
+// each event line and compare against `b3_hash`.
+//
+// `b3_hash` is computed over the canonical JSON of each event in arrival
+// order, with the per-event `signature` field zeroed. Zeroing the
+// signature makes the manifest stable across re-signing — signatures are
+// volatile in a forward-secure design, and the manifest should reflect
+// the *content* of the chain, not its signatures.
+// =====================================================================
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Manifest {
+    pub count: u32,
+    pub first_at: Option<DateTime<Utc>>,
+    pub last_at: Option<DateTime<Utc>>,
+    pub b3_hash: String,
+    pub generated_at: DateTime<Utc>,
+}
 
 #[cfg(test)]
 mod tests {

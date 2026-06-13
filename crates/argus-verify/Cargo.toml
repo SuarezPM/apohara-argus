@@ -31,6 +31,12 @@ thiserror = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 hex = { workspace = true }
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+# Used by `VerifyWorker::new()` to mint a per-worker audit signing key
+# (`SigningKey::generate(&mut rand::rngs::OsRng)`). Ephemeral for the
+# in-memory store (Roadmap 2.2); production would load from KMS/HSM.
+rand = { workspace = true }
 
 [dev-dependencies]
 # Used by `tests/shutdown.rs` to deliver SIGTERM/SIGINT to the test
