@@ -10,7 +10,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-use super::{CompletionRequest, CompletionResponse, LlmClient, LlmError, Message, Role, Usage};
+use super::{CompletionRequest, CompletionResponse, LlmClient, LlmError, Message, Usage};
 
 #[derive(Debug, Clone)]
 pub struct OpenAICompatClient {
@@ -49,6 +49,9 @@ struct ApiRequest<'a> {
 
 #[derive(Debug, Deserialize)]
 struct ApiResponse {
+    // Kept for OpenAI response compatibility; not consumed by the
+    // completion path but required for future observability/debug hooks.
+    #[allow(dead_code)]
     id: Option<String>,
     model: String,
     choices: Vec<Choice>,
@@ -57,13 +60,22 @@ struct ApiResponse {
 
 #[derive(Debug, Deserialize)]
 struct Choice {
+    // `index` and `finish_reason` are part of the OpenAI Chat Completions
+    // response contract; we do not currently branch on them, but the
+    // deserializer needs the fields present to avoid schema drift.
+    #[allow(dead_code)]
     index: u32,
     message: ChoiceMessage,
+    #[allow(dead_code)]
     finish_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 struct ChoiceMessage {
+    // `role` is always `"assistant"` for chat completions; not read by the
+    // completion path but kept for OpenAI compatibility and future audit
+    // hooks (e.g. confirming the role matches what we sent).
+    #[allow(dead_code)]
     role: String,
     content: String,
 }
@@ -83,8 +95,13 @@ struct ApiError {
 #[derive(Debug, Deserialize)]
 struct ApiErrorBody {
     message: String,
+    // `error_type` and `code` are part of the OpenAI error envelope. We
+    // surface only `message` today; keeping the other fields avoids
+    // rejecting responses when providers extend the schema.
+    #[allow(dead_code)]
     #[serde(rename = "type")]
     error_type: Option<String>,
+    #[allow(dead_code)]
     code: Option<String>,
 }
 
