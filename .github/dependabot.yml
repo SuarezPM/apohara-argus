@@ -1,0 +1,97 @@
+# Dependabot configuration for apohara-argus.
+#
+# Closes OpenSSF Scorecard's `Dependency-Update-Tool` check: a configured,
+# scheduled, grouped dependency update tool is the first signal Scorecard looks
+# for. Patch + minor updates are batched into a single weekly PR per ecosystem
+# via `groups`, so the maintainer gets one tidy PR per week per ecosystem, not
+# a per-dependency flood.
+#
+# Dependencies that would force a toolchain or audit-chain re-resolution we
+# cannot break in S.5 are listed under `ignore`. The 4 entries (sqlx, rustls,
+# rustls-webpki, rmcp) mirror the constraint cluster that produced the 6
+# ignored RUSTSEC advisories in `deny.toml` (S.2 D-5): sqlx 0.8+ requires
+# rust-version 1.94, and the pinned sqlx 0.7 line drags rustls 0.21 /
+# rustls-webpki 0.101 / paste-macro 1.0.x along with it. A Dependabot PR
+# that bumps any of these would re-open the same MSRV problem the deny.toml
+# `ignore` list already documents, so we suppress it at the source.
+
+version: 2
+
+updates:
+  # ---------------------------------------------------------------------------
+  # Rust crate dependencies (Cargo.toml / Cargo.lock at the repo root).
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "cargo"
+    directory: "/"
+    # Weekly scan; groups below batch patch + minor into one PR per ecosystem
+    # per week, so the PR cadence is one merged-or-closed item, not a flood.
+    schedule:
+      interval: "weekly"
+    # Cap the number of open Dependabot PRs at any time. 5 is the
+    # Dependabot-default for a single-ecosystem small-to-mid repo; higher
+    # values invite the "10 stale PRs nobody will close" failure mode.
+    open-pull-requests-limit: 5
+    # Conventional-commits style prefix; Dependabot appends a space + the
+    # generated message. Keeps the changelog / release-notes pipeline
+    # filterable by `chore(deps)`.
+    commit-message:
+      prefix: "chore(deps)"
+    # Surface dependency PRs in the repo's "dependencies" label so a triage
+    # board / filter can find them.
+    labels:
+      - "dependencies"
+    # Group all patch + minor updates into a single weekly PR; major
+    # updates deliberately fall outside the group and surface individually
+    # for explicit review (a major version bump of any direct dep is a
+    # breaking-change candidate that warrants a human eyes-on).
+    groups:
+      patch-and-minor:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    # The 4 packages listed here would each force a Cargo.lock re-resolution
+    # that either (a) requires a Rust toolchain newer than MSRV 1.88
+    # (sqlx 0.8+ needs 1.94), or (b) re-pulls the same advisory cluster the
+    # deny.toml `ignore` list already documents (rustls 0.21 / webpki 0.101
+    # carry RUSTSEC-2026-0098/0099/0104; rmcp 0.5 pulls paste 1.0.15
+    # RUSTSEC-2024-0436). Reopen the ignore list when sqlx 0.8 lands.
+    ignore:
+      - dependency-name: "sqlx"
+      - dependency-name: "rustls"
+      - dependency-name: "rustls-webpki"
+      - dependency-name: "rmcp"
+
+  # ---------------------------------------------------------------------------
+  # Pinned GitHub Actions in .github/workflows/*.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    # Weekly scan, same cadence as cargo so the maintainer triages both
+    # dependency classes in the same window.
+    schedule:
+      interval: "weekly"
+    # Same cap as cargo: 5 open PRs is the Dependabot default for a
+    # single-ecosystem repo.
+    open-pull-requests-limit: 5
+    # Same conventional-commits prefix so the changelog filter
+    # (`chore(deps)`) catches both ecosystems.
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+    # Group all patch + minor action updates; SHA-pinned actions in S.3
+    # already pin to immutable commit SHAs, so Dependabot will only open
+    # PRs when a new SHA of the *same* action version becomes the
+    # recommended pin. Major-version bumps fall outside the group and
+    # surface individually for explicit review (a major GitHub Action
+    # upgrade can change defaults like `persist-credentials` or
+    # `permissions` and warrants a diff read).
+    groups:
+      patch-and-minor:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
