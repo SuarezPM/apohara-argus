@@ -33,6 +33,7 @@ pub struct SecurityFinding {
     pub recommendation: String,
 }
 
+#[derive(Default)]
 pub struct SecurityReview;
 
 impl SecurityReview {

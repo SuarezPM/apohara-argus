@@ -45,6 +45,7 @@ async fn spawn_test_server() -> (SocketAddr, tokio::task::JoinHandle<()>) {
 }
 
 #[tokio::test]
+#[allow(clippy::await_holding_lock)] // the SERIAL guard must span the whole test to serialize the signal-driven test runs
 async fn sigterm_triggers_graceful_shutdown() {
     let _guard = SERIAL.lock().expect("SERIAL mutex poisoned");
 
@@ -66,6 +67,7 @@ async fn sigterm_triggers_graceful_shutdown() {
 }
 
 #[tokio::test]
+#[allow(clippy::await_holding_lock)] // the SERIAL guard must span the whole test to serialize the signal-driven test runs
 async fn sigint_triggers_graceful_shutdown() {
     let _guard = SERIAL.lock().expect("SERIAL mutex poisoned");
 

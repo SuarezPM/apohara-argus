@@ -15,6 +15,7 @@ pub struct SynthesizerInput {
     pub architecture_report: serde_json::Value,
 }
 
+#[derive(Default)]
 pub struct VerdictSynthesizer;
 
 impl VerdictSynthesizer {

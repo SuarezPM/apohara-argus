@@ -6,7 +6,6 @@
 //! - A JSON file with the structured briefing (saved to the ledger)
 
 use apohara_argus_core::{OffenderSummary, OrgSummary, TeamSummary, WeeklyBriefing};
-use argus_github::GitHubClient;
 use argus_llm::{LlmClient, NimClient};
 use chrono::{Duration, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
@@ -156,7 +155,7 @@ impl LensRunner {
         let (mut briefing, org_summary) = self.aggregate(org, week_starting, prs);
 
         // Generate the CTO script
-        let prs_summary = prs
+        let _prs_summary = prs
             .iter()
             .map(|p| {
                 format!(
@@ -198,7 +197,7 @@ impl std::fmt::Display for PRBriefSummary {
     }
 }
 
-fn render_markdown(b: &WeeklyBriefing, org: &OrgSummary, prs: &[PRBriefSummary]) -> String {
+fn render_markdown(b: &WeeklyBriefing, org: &OrgSummary, _prs: &[PRBriefSummary]) -> String {
     let mut s = String::new();
     s.push_str(&format!("# ARGUS Weekly Briefing — `{}`\n\n", b.org));
     s.push_str(&format!("Week of: {}\n\n", b.week_starting));

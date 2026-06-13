@@ -81,7 +81,7 @@ impl SetupResponse {
             serde_json::from_str(MANIFEST).expect("MANIFEST is valid JSON (enforced by tests)");
         let install_url = format!(
             "https://github.com/settings/apps/new?manifest={}",
-            urlencoding(&MANIFEST)
+            urlencoding(MANIFEST)
         );
         Self {
             manifest,

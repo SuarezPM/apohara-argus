@@ -22,6 +22,7 @@ pub struct ArchConcern {
     pub fix: String,
 }
 
+#[derive(Default)]
 pub struct ArchitectureFit;
 
 impl ArchitectureFit {

@@ -18,7 +18,6 @@ use axum::{
 };
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 use crate::audit_store::InMemoryAuditStore;
 

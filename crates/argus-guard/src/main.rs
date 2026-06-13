@@ -6,7 +6,7 @@
 //!   argus-guard --diff pr.diff --json             # JSON output
 //!   argus-guard --diff pr.diff --model meta/llama-3.1-405b-instruct
 
-use argus_guard::{Decision, GuardOutput, GuardRunner};
+use argus_guard::{GuardOutput, GuardRunner};
 use clap::Parser;
 use std::path::PathBuf;
 use std::process::ExitCode;

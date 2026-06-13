@@ -240,7 +240,7 @@ async fn webhook_with_valid_signature_succeeds() {
     let _guard = ENV_LOCK.lock().await;
     let gh = MockGitHub::start().await;
     std::env::set_var("ARGUS_APP_INSTALL_TOKEN", INSTALL_TOKEN);
-    std::env::set_var("ARGUS_GITHUB_API_BASE_URL", &gh.base_url());
+    std::env::set_var("ARGUS_GITHUB_API_BASE_URL", gh.base_url());
 
     let app = make_app();
     let body = sample_pr_event("opened").to_string();
@@ -383,7 +383,7 @@ async fn webhook_with_unknown_event_is_ignored() {
     let app = make_app();
 
     std::env::set_var("ARGUS_APP_INSTALL_TOKEN", INSTALL_TOKEN);
-    std::env::set_var("ARGUS_GITHUB_API_BASE_URL", &gh.base_url());
+    std::env::set_var("ARGUS_GITHUB_API_BASE_URL", gh.base_url());
 
     // A `pull_request` event (in the allowlist) but with an
     // action we don't act on (`closed`). Per the GitHub

@@ -21,6 +21,7 @@ pub struct SlopExample {
     pub reason: String,
 }
 
+#[derive(Default)]
 pub struct SlopDetector;
 
 impl SlopDetector {

@@ -2,17 +2,6 @@
 
 use argus_llm::{LlmClient, NimClient};
 use argus_slop::pipeline::AnalysisPipeline;
-use argus_slop::Analyzer;
-
-const FAKE_CLEAN_DIFF: &str = r#"
-diff --git a/src/utils.py b/src/utils.py
-@@ -1,3 +1,7 @@
-+def is_valid_email(s: str) -> bool:
-+    return '@' in s and '.' in s
-+
- def unused_helper():
-     pass
-"#;
 
 const FAKE_SECRET_DIFF: &str = r#"
 diff --git a/src/config.py b/src/config.py

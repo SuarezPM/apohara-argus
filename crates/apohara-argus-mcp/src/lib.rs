@@ -17,10 +17,9 @@
 use std::future::Future;
 use std::time::Instant;
 
-use apohara_argus_core::Result as ArgusResult;
-use argus_llm::{LlmClient, NimClient};
+use argus_llm::NimClient;
 use argus_slop::pipeline::AnalysisPipeline;
-use argus_slop::{Analyzer, ArchitectureFit, SecurityReview, SlopDetector, VerdictSynthesizer};
+use argus_slop::{Analyzer, ArchitectureFit, SecurityReview, SlopDetector};
 use rmcp::{
     handler::server::{router::tool::ToolRouter, tool::Parameters},
     model::ServerInfo,
@@ -55,10 +54,14 @@ pub struct SpecialistError {
 
 /// Shared state for the MCP server. We hold the NIM client once and
 /// reuse it across tool calls; only the per-call API key + diff change.
+#[derive(Default)]
 pub struct ArgusMcp {
     nim: NimClient,
     /// Per-call NIM key. Set by the agent (Claude Code / Codex) via
-    /// the `ARGUS_NIM_KEY` env var at process startup.
+    /// the `ARGUS_NIM_KEY` env var at process startup. Also re-read
+    /// per call via `current_key()` so operators can rotate keys
+    /// without restarting the MCP server.
+    #[allow(dead_code)] // populated from env on construction
     nim_key: String,
     /// Default model for the specialists. In a future iteration this
     /// could be a per-specialist model registry.
@@ -265,7 +268,7 @@ impl ArgusMcp {
 
         let verdict_report = pipeline_output.verdict;
         let fix_plan = apohara_argus_core::FixPlan::from_findings(&[]);
-        let mut combined_findings = serde_json::json!({
+        let combined_findings = serde_json::json!({
             "slop": slop_report,
             "security": sec_report,
             "arch": arch_report,

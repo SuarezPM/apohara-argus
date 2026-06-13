@@ -4,7 +4,7 @@
 //! - POST /analyze        { pr_url, repo_context?, post_comment?, set_labels? }
 //! - GET  /health
 //! - GET  /audit/export   [Refs: 2.2] NDJSON stream of Article 12
-//!                         audit events, with a manifest footer.
+//!   audit events, with a manifest footer.
 //!
 //! The NIM key is BYOK: pass it in the `X-LLM-Key` header. The server
 //! also accepts ARGUS_NIM_KEY env var as a fallback.

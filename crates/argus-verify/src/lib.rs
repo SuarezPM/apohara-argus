@@ -4,14 +4,14 @@
 //! - `POST /analyze`        — analyze a PR URL, return verdict
 //! - `GET  /health`         — health check
 //! - `GET  /audit/export`   — NDJSON stream of Article 12 audit events
-//!                            (Roadmap 2.2), with a manifest footer.
+//!   (Roadmap 2.2), with a manifest footer.
 //!
 //! The user provides their NIM key in the `X-LLM-Key` header (BYOK).
 //! If a GitHub token is configured, the worker will also post a comment
 //! and set a label on the PR.
 
 use apohara_argus_core::{
-    ArgusError, DataClass, DecisionArtifact, FixPlan, PRReview, RiskScore, Verdict, VerdictStatus,
+    ArgusError, DataClass, DecisionArtifact, FixPlan, PRReview, Verdict, VerdictStatus,
 };
 use argus_crypto::chain::append;
 use argus_crypto::identity::AgentKeypair;
@@ -104,7 +104,7 @@ pub struct VerifyWorker {
 const WORKER_GENESIS: [u8; 32] = [0u8; 32];
 
 impl VerifyWorker {
-    pub fn new(nim_key: &str) -> Self {
+    pub fn new(_nim_key: &str) -> Self {
         Self {
             nim: NimClient::new(),
             nim_model: ModelRegistry::default_for_role(ModelRole::Verdict),

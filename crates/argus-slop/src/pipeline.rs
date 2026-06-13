@@ -20,6 +20,7 @@ pub struct PipelineOutput {
     pub total_latency_ms: u64,
 }
 
+#[derive(Default)]
 pub struct AnalysisPipeline {
     slop: super::slop_detector::SlopDetector,
     security: super::security::SecurityReview,
@@ -105,11 +106,9 @@ impl AnalysisPipeline {
         let status = if matches!(
             sec.highest_severity,
             super::security::SecuritySeverity::Critical | super::security::SecuritySeverity::High
-        ) {
-            VerdictStatus::Halted
-        } else if slop.slop_score > 0.7 && arch.fit_score > 0.5 {
-            VerdictStatus::Halted
-        } else if slop.slop_score > 0.85 || arch.fit_score > 0.7 {
+        ) || (slop.slop_score > 0.7 && arch.fit_score > 0.5)
+            || (slop.slop_score > 0.85 || arch.fit_score > 0.7)
+        {
             VerdictStatus::Halted
         } else if slop.slop_score > 0.5 || arch.fit_score > 0.5 {
             VerdictStatus::ReviewRequired

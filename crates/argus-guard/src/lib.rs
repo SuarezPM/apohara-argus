@@ -10,7 +10,7 @@
 //! The LLM call is BYOK: the user provides their NVIDIA NIM key via
 //! --nim-key or ARGUS_NIM_KEY env var.
 
-use apohara_argus_core::{RiskScore, VerdictStatus};
+use apohara_argus_core::VerdictStatus;
 use argus_llm::NimClient;
 use argus_slop::pipeline::AnalysisPipeline;
 use serde::{Deserialize, Serialize};
