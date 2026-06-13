@@ -1,5 +1,9 @@
 # ARGUS — AI Slop Defense Layer
 
+![aislop score](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/SuarezPM/apohara-argus/main/aislop-score.json)
+![Rust](https://img.shields.io/badge/rust-100%25-orange)
+![EU AI Act](https://img.shields.io/badge/EU%20AI%20Act-Art.%2012%20ready-blue)
+
 > The first trust layer for AI-generated code. 5 Platzi Reto projects in one product.
 > Pure Rust 100%. BYOK (NVIDIA NIM compatible). 11 crates, one binary.
 
