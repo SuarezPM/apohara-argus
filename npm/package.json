@@ -1,0 +1,41 @@
+{
+  "name": "@apohara/argus",
+  "version": "0.1.0",
+  "description": "AI slop defense layer for code review. Rust binary, npm wrapper.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SuarezPM/apohara-argus.git",
+    "directory": "npm"
+  },
+  "homepage": "https://github.com/SuarezPM/apohara-argus",
+  "bugs": "https://github.com/SuarezPM/apohara-argus/issues",
+  "keywords": [
+    "ai",
+    "code-review",
+    "mcp",
+    "rust",
+    "eu-ai-act",
+    "audit-chain",
+    "byok"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "apohara-argus": "bin/apohara-argus.js",
+    "apohara-argus-mcp": "bin/apohara-argus-mcp.js"
+  },
+  "files": [
+    "bin/",
+    "scripts/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

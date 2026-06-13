@@ -1,0 +1,16 @@
+name: publish-npm
+
+# PLACEHOLDER — full implementation lands in argus-silver-roadmap/N.2.
+# This file exists so the npm/ wrapper has a CI home from day one and
+# the directory layout is reviewable. It will be expanded to:
+#   - npm trusted publishing (OIDC) on every GitHub Release
+#   - provenance attestation for the npm tarball
+#   - dry-run on pull_request, real publish on release
+#
+# Triggers are intentionally inert (`workflow_dispatch` only) until N.2.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
