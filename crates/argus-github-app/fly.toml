@@ -1,0 +1,93 @@
+# fly.toml — one-click deploy config for the ARGUS GitHub App.
+#
+# Usage:
+#   1. Install the fly CLI: https://fly.io/docs/hands-on/install-flyctl/
+#   2. Sign in: fly auth signup (or `fly auth login`)
+#   3. Replace `apohara-argus` below with a unique app name
+#      (e.g. `argus-yourname` or `yourorg-argus`).
+#   4. `fly launch --copy-config --no-deploy`
+#   5. Set the required secrets (NEVER commit these):
+#        fly secrets set \
+#          ARGUS_APP_WEBHOOK_SECRET=... \
+#          ARGUS_APP_INSTALL_TOKEN=...
+#      (Optional: `ARGUS_NIM_KEY=...` for the LLM layer.)
+#   6. `fly deploy`
+#   7. Point the GitHub App's webhook URL at
+#      https://<your-app>.fly.dev/webhook
+#   8. Install the App on a repo; the next PR open will fire
+#      the webhook and the deterministic slop layer will
+#      comment + label.
+#
+# Free tier eligible (256 MB RAM, 1 shared CPU, auto-stop
+# when idle). The `min_machines_running = 0` line is what
+# keeps the App free — Fly will cold-start on the first
+# webhook after a quiet window (typically < 5s).
+
+app = "apohara-argus"
+primary_region = "iad"
+
+# Always serve over HTTPS. GitHub requires the webhook URL
+# to be HTTPS; Fly's `force_https` is the standard way to
+# do that without a custom reverse proxy.
+force_https = true
+
+[build]
+  # The Dockerfile lives inside the crate directory.
+  dockerfile = "Dockerfile"
+  # Pinned via SHA in the release workflow. The `latest`
+  # tag is for `fly launch --copy-config` so Fly can pull
+  # the right image on first deploy.
+  image = "apohara-argus:latest"
+
+[env]
+  # The binary reads PORT at startup. Fly sets PORT=8080 by
+  # convention; we set it explicitly so a misconfigured env
+  # doesn't sneak a different port in.
+  PORT = "8080"
+  # Default labels are committed in the binary. Operators
+  # can override per-deploy via `fly secrets set` or in
+  # [env] above.
+  ARGUS_APP_LABEL_PASS = "argus/approved"
+  ARGUS_APP_LABEL_WARN = "argus/needs-review"
+  ARGUS_APP_LABEL_FAIL = "argus/halted"
+  # The events we act on. PR-action filter (`opened`,
+  # `synchronize`, `reopened`) is enforced inside the
+  # handler, not via this allowlist.
+  ARGUS_APP_EVENTS = "pull_request"
+
+[http_service]
+  internal_port = 8080
+  # For `force_https = true` to terminate TLS, we need
+  # Fly's `https` handler on port 443. The `auto_stop`
+  # + `auto_start` combination is what makes the App
+  # free-tier friendly: Fly spins the machine down when
+  # there are no requests, and spins it back up on the
+  # next webhook delivery.
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  # Health check on /health. The handler returns
+  # `{"ok": true, "service": "argus-github-app", ...}`.
+  # Fly hits this every 30s; if it 200s, the machine
+  # stays up; if it 5xx's 3x in a row, Fly restarts.
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/health"
+
+[[vm]]
+  # Free tier: 256 MB RAM, 1 shared CPU. Cold-start
+  # penalty (~3-5s) is acceptable for a webhook handler
+  # because GitHub retries with exponential backoff.
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "256mb"
+  # Disable swap on the free tier — the 256 MB budget is
+  # tight and swap thrashing would degrade webhook latency
+  # past GitHub's 10s timeout.
+  swap_size_mb = 0
