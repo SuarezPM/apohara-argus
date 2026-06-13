@@ -249,9 +249,10 @@ pub async fn a2a_message_handler(
 }
 
 /// Marker for the 404 fallback when A2A is disabled. Used by `main.rs`
-/// to merge the A2A sub-router conditionally.
+/// to merge the A2A sub-router conditionally. Must be `pub` (not
+/// `pub(crate)`) so the binary entry point can import it.
 #[allow(dead_code)]
-pub(crate) async fn a2a_disabled_handler() -> impl IntoResponse {
+pub async fn a2a_disabled_handler() -> impl IntoResponse {
     (
         StatusCode::NOT_FOUND,
         Json(serde_json::json!({
