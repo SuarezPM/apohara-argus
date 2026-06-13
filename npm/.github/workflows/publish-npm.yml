@@ -1,16 +1,67 @@
 name: publish-npm
 
-# PLACEHOLDER — full implementation lands in argus-silver-roadmap/N.2.
-# This file exists so the npm/ wrapper has a CI home from day one and
-# the directory layout is reviewable. It will be expanded to:
-#   - npm trusted publishing (OIDC) on every GitHub Release
-#   - provenance attestation for the npm tarball
-#   - dry-run on pull_request, real publish on release
+# Publish @apohara/argus to npmjs.com via trusted publishing (OIDC).
 #
-# Triggers are intentionally inert (`workflow_dispatch` only) until N.2.
+# This workflow is the N.2 deliverable; the placeholder (created in N.1)
+# is replaced by this full version. Two triggers:
+#   1. pull_request: dry-run only (`npm publish --dry-run --provenance`)
+#   2. release (published): real publish via OIDC trusted publishing
+#
+# Trusted publishing: the npm token never lives in the repo. The
+# `id-token: write` permission + the npm publisher claim (configured
+# at https://www.npmjs.com/package/@apohara/argus/access) lets npm
+# verify the workflow's identity cryptographically.
 
 on:
+  pull_request:
+    paths: ['npm/**']
+  release:
+    types: [published]
+  # We use the npm/ subtree, not the rust workspace
   workflow_dispatch:
 
+# OIDC trusted publishing needs id-token: write.
+# Contents: read is the minimum for checkout; the OIDC token is the
+# actual auth.
 permissions:
   contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: npm publish
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: npm
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run syntax checks
+        # No test suite yet (out of scope for N.2). Use node --check on
+        # the wrapper scripts to catch syntax errors before publish.
+        run: |
+          node --check bin/apohara-argus.js
+          node --check bin/apohara-argus-mcp.js
+          node --check scripts/install.js
+          node --check scripts/postinstall.js
+      - name: Verify package contents
+        run: npm pack --dry-run
+      - name: Publish (dry-run on PR, real on release)
+        # No NODE_AUTH_TOKEN: setup-node + id-token: write + the
+        # trusted-publisher claim on npmjs.com authenticate this
+        # workflow cryptographically. There is no long-lived NPM_TOKEN
+        # in the repo's secrets.
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            npm publish --provenance --access public
+          else
+            npm publish --dry-run --provenance --access public
+          fi
