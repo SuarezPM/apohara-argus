@@ -22,6 +22,7 @@ use std::sync::{Arc, Mutex};
 use argus_core::DecisionArtifact;
 
 use super::audit::{emit_audit_event, next_prev_hash};
+use super::circuit_breaker::{CircuitBreakerConfig, LlmCircuitBreaker};
 use super::model_registry::{ModelRegistry, ModelRole};
 use super::openai_compat::OpenAICompatClient;
 use super::{CompletionRequest, CompletionResponse, LlmClient, LlmError};
@@ -57,9 +58,12 @@ fn llm_receipt_decision() -> DecisionArtifact {
     }
 }
 
-#[derive(Debug, Clone)]
 pub struct NimClient {
-    inner: OpenAICompatClient,
+    /// Effective inner client. May be the raw `OpenAICompatClient` or,
+    /// after [`Self::with_circuit_breaker`], a `LlmCircuitBreaker`
+    /// wrapping it. We store as `Box<dyn LlmClient>` so the breaker
+    /// decorator can sit transparently in the call chain.
+    inner: Box<dyn LlmClient + Send + Sync>,
     /// Explicit model override (set via `with_model`). Empty means: fall
     /// back to the role-based registry lookup at call time.
     pub model: String,
@@ -76,10 +80,21 @@ pub struct NimClient {
     pub prev_hash: Arc<Mutex<[u8; 32]>>,
 }
 
+impl std::fmt::Debug for NimClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NimClient")
+            .field("provider", &self.inner.provider_name())
+            .field("model", &self.model)
+            .field("model_role", &self.model_role)
+            .field("signing_key_set", &self.signing_key.is_some())
+            .finish_non_exhaustive()
+    }
+}
+
 impl Default for NimClient {
     fn default() -> Self {
         Self {
-            inner: OpenAICompatClient::new(NIM_DEFAULT_BASE_URL),
+            inner: Box::new(OpenAICompatClient::new(NIM_DEFAULT_BASE_URL)),
             model: String::new(),
             model_role: ModelRole::Verdict,
             signing_key: None,
@@ -100,7 +115,7 @@ impl NimClient {
     }
 
     pub fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
-        self.inner = OpenAICompatClient::new(base_url);
+        self.inner = Box::new(OpenAICompatClient::new(base_url));
         self
     }
 
@@ -115,6 +130,18 @@ impl NimClient {
     /// 32-byte secret) at startup. Tests and dev environments can omit.
     pub fn with_signing_key(mut self, key: SigningKey) -> Self {
         self.signing_key = Some(key);
+        self
+    }
+
+    /// Wrap the current inner client in a [`LlmCircuitBreaker`] with
+    /// the given config. Subsequent `complete()` calls flow through
+    /// the breaker; once the upstream starts failing repeatedly, the
+    /// breaker opens and short-circuits with `LlmError::CircuitOpen`.
+    pub fn with_circuit_breaker(mut self, config: CircuitBreakerConfig) -> Self {
+        let old = self.inner;
+        let breaker: LlmCircuitBreaker<Box<dyn LlmClient + Send + Sync>> =
+            LlmCircuitBreaker::new(old, config);
+        self.inner = Box::new(breaker);
         self
     }
 }

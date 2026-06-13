@@ -26,6 +26,9 @@ pub mod openai_compat;
 pub mod mock;
 pub mod retry;
 
+#[cfg(test)]
+pub mod test_util;
+
 pub use model_registry::{ModelRegistry, ModelRole};
 
 #[cfg(feature = "dalle")]
@@ -176,6 +179,25 @@ pub trait LlmClient: Send + Sync {
         .with_temperature(temperature)
         .with_max_tokens(max_tokens);
         self.complete(req, api_key).await
+    }
+}
+
+/// Blanket impl so a `Box<dyn LlmClient>` can itself be wrapped in
+/// another decorator (e.g., `LlmCircuitBreaker<Box<dyn LlmClient>>`).
+/// Without this, composing `RetryClient<OpenAICompatClient>` inside a
+/// `LlmCircuitBreaker` would require concrete types at every layer.
+#[async_trait]
+impl LlmClient for Box<dyn LlmClient + Send + Sync> {
+    fn provider_name(&self) -> &str {
+        (**self).provider_name()
+    }
+
+    async fn complete(
+        &self,
+        request: CompletionRequest,
+        api_key: &str,
+    ) -> Result<CompletionResponse, LlmError> {
+        (**self).complete(request, api_key).await
     }
 }
 
