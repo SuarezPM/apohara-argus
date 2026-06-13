@@ -110,7 +110,7 @@ sha2 = "0.10"
 subtle = "2"
 
 # Markdown parsing (para los prompts .md)
-pulldown-cmark = "0.10"
+pulldown-cmark = "0.13"
 
 # Syn AST (for argus-slop deterministic pre-flight analyzer, item 5.1).
 # `visit` powers recursive AST walks; `full` enables every node type
