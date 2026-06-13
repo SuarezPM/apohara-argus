@@ -1,0 +1,31 @@
+[package]
+name = "argus-benchmarks"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "ARGUS crate: argus-benchmarks — labeled dataset + mock NIM + precision/recall, latency, and cost benches"
+repository.workspace = true
+# Internal library — not published to crates.io. The benchmarks are
+# CI-internal surfaces (run by .github/workflows/bench.yml on every PR);
+# the dataset and mock NIM are development-only artifacts.
+publish = false
+
+[dependencies]
+argus-core = { workspace = true }
+argus-llm = { workspace = true }
+argus-slop = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+# Token / diff hashing for the mock NIM's deterministic lookup.
+# BLAKE3 is already a transitive dep via argus-crypto, but listing
+# it explicitly here makes the intent clear.
+blake3 = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+serde_json = { workspace = true }

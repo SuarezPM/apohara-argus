@@ -28,6 +28,9 @@ data/
 *.db-journal
 *.sqlite
 *.sqlite-journal
+# Exception: the argus-benchmarks dataset is committed source-of-truth
+# (it powers the precision/recall bench, see crates/argus-benchmarks/data/).
+!crates/argus-benchmarks/data/
 
 # Generated docs
 docs/screenshots/

@@ -14,6 +14,7 @@ members = [
   "crates/argus-cli",
   "crates/argus-otel",
   "crates/argus-mcp",
+  "crates/argus-benchmarks",
 ]
 
 [workspace.package]
@@ -123,6 +124,7 @@ argus-lens = { path = "crates/argus-lens" }
 argus-agent = { path = "crates/argus-agent" }
 argus-otel = { path = "crates/argus-otel" }
 argus-mcp = { path = "crates/argus-mcp" }
+argus-benchmarks = { path = "crates/argus-benchmarks" }
 
 [profile.release]
 opt-level = 3
