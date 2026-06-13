@@ -1,0 +1,72 @@
+[package]
+name = "argus-github-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "ARGUS crate: argus-github-app — GitHub App front door that triggers PR review on pull_request events"
+repository.workspace = true
+# Internal binary — not published to crates.io. The GitHub App
+# backend is a single-binary deploy (see Dockerfile + fly.toml in
+# the same directory); users install the App from the GitHub
+# Marketplace, not from crates.io.
+publish = false
+
+[[bin]]
+name = "argus-github-app"
+path = "src/main.rs"
+
+[dependencies]
+# Workspace internals — the App reuses the same verification
+# pipeline (argus-verify::VerifyWorker) and the same GitHub
+# client (post_comment, set_labels) that the CLI uses.
+argus-core = { workspace = true }
+argus-verify = { workspace = true }
+argus-github = { workspace = true }
+argus-slop = { workspace = true }
+argus-llm = { workspace = true }
+argus-otel = { workspace = true }
+
+# Web
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+
+# Async + tracing
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Errors
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# HMAC-SHA256 + constant-time compare for webhook signature
+# verification. `subtle::ConstantTimeEq` is the timing-attack
+# defense — a plain `==` on `[u8; 32]` would leak the prefix
+# length of the matched secret one byte at a time.
+hmac = { workspace = true }
+sha2 = { workspace = true }
+subtle = { workspace = true }
+hex = { workspace = true }
+blake3 = { workspace = true }
+
+# Misc
+chrono = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+rand = { workspace = true }
+# URL parsing for the SSRF check (CordonEnforcer). Same
+# version as `argus-github` (workspace-resolved), so this
+# adds no new resolution work.
+url = { workspace = true }
+
+[dev-dependencies]
+# Used by `tests/webhook_integration.rs` to drive the App's
+# axum router without a real socket (and to spin up a mock
+# GitHub API on a random port via `tokio::net::TcpListener`).
+tower = { workspace = true, features = ["util"] }
+http-body-util = "0.1"

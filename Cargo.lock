@@ -231,6 +231,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "argus-github-app"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "argus-core",
+ "argus-github",
+ "argus-llm",
+ "argus-otel",
+ "argus-slop",
+ "argus-verify",
+ "axum",
+ "blake3",
+ "chrono",
+ "hex",
+ "hmac",
+ "http-body-util",
+ "rand 0.8.6",
+ "serde",
+ "serde_json",
+ "sha2",
+ "subtle",
+ "thiserror 1.0.69",
+ "tokio",
+ "tower 0.4.13",
+ "tower-http 0.5.2",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "argus-guard"
 version = "0.1.0"
 dependencies = [

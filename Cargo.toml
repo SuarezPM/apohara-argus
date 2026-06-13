@@ -15,6 +15,7 @@ members = [
   "crates/argus-otel",
   "crates/argus-mcp",
   "crates/argus-benchmarks",
+  "crates/argus-github-app",
 ]
 
 [workspace.package]
@@ -99,6 +100,15 @@ base64 = "0.22"
 hex = "0.4"
 rand = "0.8"
 
+# HMAC + SHA-256 for GitHub App webhook signature verification.
+# `subtle` provides constant-time comparison (timing-attack defense).
+# Versions pinned to the ones already resolved transitively in
+# Cargo.lock (subtle 2.6, hmac 0.12, sha2 0.10) so adding this
+# crate introduces no new resolution work.
+hmac = "0.12"
+sha2 = "0.10"
+subtle = "2"
+
 # Markdown parsing (para los prompts .md)
 pulldown-cmark = "0.10"
 
@@ -125,6 +135,7 @@ argus-agent = { path = "crates/argus-agent" }
 argus-otel = { path = "crates/argus-otel" }
 argus-mcp = { path = "crates/argus-mcp" }
 argus-benchmarks = { path = "crates/argus-benchmarks" }
+argus-github-app = { path = "crates/argus-github-app" }
 
 [profile.release]
 opt-level = 3
