@@ -33,7 +33,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "postinstall": "node scripts/postinstall.js"
+    "postinstall": "node scripts/postinstall.js",
+    "test": "node --test test/*.js"
   },
   "publishConfig": {
     "access": "public"
