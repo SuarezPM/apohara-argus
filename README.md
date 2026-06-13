@@ -13,6 +13,7 @@
 ![Tests 145+](https://img.shields.io/badge/tests-145%2B%20passing-brightgreen)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/SuarezPM/apohara-argus/badge)](https://scorecard.dev/viewer/?uri=github.com/SuarezPM/apohara-argus)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/XXXXX/badge)](https://www.bestpractices.dev/projects/XXXXX)
+[Install](#install)
 [Security](SECURITY.md)
 [Branch protection](docs/branch-protection.md)
 [Benchmarks](docs/BENCHMARK.md)
@@ -191,6 +192,39 @@ Opt-in via `ARGUS_A2A_DISABLED=false`. Google A2A orchestrators can discover and
         ───────
         MCP server (apohara-argus-mcp) ──► Claude Code / Codex / Cursor
         A2A AgentCards         ──► Google A2A orchestrators
+```
+
+---
+
+## Install
+
+ARGUS ships three install paths. Pick the one that matches your environment.
+
+| Path | Command | What you get |
+|---|---|---|
+| **npm (no Rust needed)** | `npx @apohara/argus --help` | The CLI + the MCP server. Downloads the right binary on first run. |
+| **cargo (Rust toolchain)** | `cargo install apohara-argus-cli` | Just the CLI. Faster startup, no download step. |
+| **Docker** | `docker run -e ARGUS_NIM_KEY=$YOUR_NIM_KEY SuarezPM/apohara-argus --help` | Full containerized ARGUS, no host dependencies. |
+
+All three paths ship the same MIT-licensed core. The Docker image bundles every dependency; the npm wrapper downloads a prebuilt binary on first invocation; the cargo path compiles from source inside your toolchain.
+
+### Build from source
+
+```bash
+git clone https://github.com/SuarezPM/apohara-argus
+cd apohara-argus
+cargo build --release
+./target/release/argus --help
+```
+
+### Verify the install
+
+```bash
+npx @apohara/argus health
+# or
+apohara-argus health
+# or
+docker run -e ARGUS_NIM_KEY=$YOUR_NIM_KEY SuarezPM/apohara-argus health
 ```
 
 ---
