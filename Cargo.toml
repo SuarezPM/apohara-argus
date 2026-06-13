@@ -122,18 +122,22 @@ quote = "1"
 # Plotting (slop radar SVG generation, fallback si no hay DALL-E)
 plotters = "0.3"
 
-# Internal crate deps
-argus-core = { path = "crates/argus-core" }
-argus-crypto = { path = "crates/argus-crypto" }
-argus-llm = { path = "crates/argus-llm" }
-argus-slop = { path = "crates/argus-slop" }
-argus-github = { path = "crates/argus-github" }
-argus-guard = { path = "crates/argus-guard" }
-argus-verify = { path = "crates/argus-verify" }
-argus-lens = { path = "crates/argus-lens" }
-argus-agent = { path = "crates/argus-agent" }
-argus-otel = { path = "crates/argus-otel" }
-argus-mcp = { path = "crates/argus-mcp" }
+# Internal crate deps (version required for cargo publish even though these
+# crates are publish=false; the path is for workspace development, the
+# version is what cargo records in the published tarball's Cargo.toml)
+argus-core      = { version = "0.1.0", path = "crates/argus-core" }
+argus-crypto    = { version = "0.1.0", path = "crates/argus-crypto" }
+argus-llm       = { version = "0.1.0", path = "crates/argus-llm" }
+argus-slop      = { version = "0.1.0", path = "crates/argus-slop" }
+argus-github    = { version = "0.1.0", path = "crates/argus-github" }
+argus-guard     = { version = "0.1.0", path = "crates/argus-guard" }
+argus-verify    = { version = "0.1.0", path = "crates/argus-verify" }
+argus-lens      = { version = "0.1.0", path = "crates/argus-lens" }
+argus-agent     = { version = "0.1.0", path = "crates/argus-agent" }
+argus-dashboard = { version = "0.1.0", path = "crates/argus-dashboard" }
+argus-cli       = { version = "0.1.0", path = "crates/argus-cli" }
+argus-otel      = { version = "0.1.0", path = "crates/argus-otel" }
+argus-mcp       = { version = "0.1.0", path = "crates/argus-mcp" }
 argus-benchmarks = { path = "crates/argus-benchmarks" }
 argus-github-app = { path = "crates/argus-github-app" }
 
