@@ -29,3 +29,18 @@ blake3 = { workspace = true }
 [dev-dependencies]
 tokio = { workspace = true }
 serde_json = { workspace = true }
+
+# The 3 harness=false benches — runs as plain binaries under both
+# `cargo test` and `cargo bench` (same pattern as apohara-agentguard's
+# `regex_redos` and `hook_latency`).
+[[bench]]
+name = "precision_recall"
+harness = false
+
+[[bench]]
+name = "latency"
+harness = false
+
+[[bench]]
+name = "cost"
+harness = false
