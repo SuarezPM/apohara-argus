@@ -12,6 +12,7 @@ members = [
   "crates/argus-agent",
   "crates/argus-dashboard",
   "crates/argus-cli",
+  "crates/argus-otel",
 ]
 
 [workspace.package]
@@ -65,6 +66,14 @@ anyhow = "1"
 thiserror = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# OpenTelemetry [Refs: 6.3] — stdout exporter, no external collector
+# needed. Use the official `opentelemetry` and `opentelemetry_sdk` crates,
+# pinned to the same minor to avoid the API churn across versions.
+opentelemetry = "0.27"
+opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
+opentelemetry-stdout = { version = "0.27", features = ["trace"] }
+tracing-opentelemetry = "0.28"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 dotenvy = "0.15"
@@ -96,6 +105,7 @@ argus-guard = { path = "crates/argus-guard" }
 argus-verify = { path = "crates/argus-verify" }
 argus-lens = { path = "crates/argus-lens" }
 argus-agent = { path = "crates/argus-agent" }
+argus-otel = { path = "crates/argus-otel" }
 
 [profile.release]
 opt-level = 3

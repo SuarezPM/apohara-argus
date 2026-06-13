@@ -523,9 +523,11 @@ async fn app_js() -> impl IntoResponse {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
+    // OpenTelemetry init [Refs: 6.3]. Opt-in via `ARGUS_OTEL_DISABLED`.
+    let _otel_guard = argus_otel::init("argus-dashboard");
+    let _ = tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,argus=debug")))
-        .init();
+        .try_init();
 
     let port: u16 = std::env::var("ARGUS_DASHBOARD_PORT")
         .ok().and_then(|s| s.parse().ok()).unwrap_or(3000);

@@ -36,9 +36,17 @@ struct AppState {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
+    // Initialize OTel stdout exporter + tracing-subscriber fmt layer.
+    // Opt-in via `ARGUS_OTEL_DISABLED=true` (default off for zero overhead).
+    // The init function uses `try_init` so if a global subscriber is
+    // already set (e.g., from a test harness), this is a no-op.
+    let _otel_guard = argus_otel::init("argus-verify");
+
+    // Fallback fmt init for the case where OTel is disabled. Cheap when
+    // OTel is on (the layer is a thin pass-through to stdout).
+    let _ = tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,argus=debug")))
-        .init();
+        .try_init();
 
     let port: u16 = std::env::var("ARGUS_API_PORT")
         .ok().and_then(|s| s.parse().ok()).unwrap_or(8080);

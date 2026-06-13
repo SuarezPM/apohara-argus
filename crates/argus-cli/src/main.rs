@@ -65,9 +65,12 @@ enum Cmd {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> ExitCode {
-    tracing_subscriber::fmt()
+    // OpenTelemetry init [Refs: 6.3]. Opt-in via `ARGUS_OTEL_DISABLED`.
+    // The `try_init` is a no-op when OTel is disabled.
+    let _otel_guard = argus_otel::init("argus-cli");
+    let _ = tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
-        .init();
+        .try_init();
     let cli = Cli::parse();
 
     if cli.nim_key.is_empty() {
