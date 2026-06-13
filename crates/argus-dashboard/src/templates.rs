@@ -168,7 +168,10 @@ mod tests {
             "expected exactly 2 <article> elements, got: {}",
             html.matches("<article ").count()
         );
-        assert!(html.contains("tabindex=\"0\""), "articles must be focusable");
+        assert!(
+            html.contains("tabindex=\"0\""),
+            "articles must be focusable"
+        );
     }
 
     // ---- Edge case: empty cohort renders without panic ----
@@ -187,10 +190,8 @@ mod tests {
     // ---- Regression: render_dashboard wraps all cohorts in <main> ----
     #[test]
     fn render_dashboard_includes_all_cohort_sections() {
-        let mut state = DashboardState::from_review(
-            "https://github.com/o/r/pull/1".into(),
-            "Demo PR".into(),
-        );
+        let mut state =
+            DashboardState::from_review("https://github.com/o/r/pull/1".into(), "Demo PR".into());
         state.add_cohort(cohort(
             "slop",
             "Aegis Slop",

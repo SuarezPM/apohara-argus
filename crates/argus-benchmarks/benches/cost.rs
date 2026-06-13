@@ -50,8 +50,11 @@ fn fmt_usd(d: f64) -> String {
 }
 
 fn main() {
-    let workspace_root = std::env::current_dir().expect("cwd");
-    let data_dir = workspace_root.join("crates/argus-benchmarks/data");
+    // `cargo bench` runs the binary with cwd = the package dir
+    // (crates/argus-benchmarks), not the workspace root. Anchor the data
+    // path to CARGO_MANIFEST_DIR so it works regardless of cwd.
+    let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let data_dir = manifest_dir.join("data");
     let (prs, _labels) = load_dataset(data_dir.join("prs.jsonl"), data_dir.join("labels.json"))
         .expect("load dataset");
     let client = MockNimClient::new(&prs);

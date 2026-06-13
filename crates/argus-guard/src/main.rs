@@ -12,7 +12,11 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 #[derive(Parser, Debug)]
-#[command(name = "argus-guard", about = "ARGUS pre-commit AI slop check", version)]
+#[command(
+    name = "argus-guard",
+    about = "ARGUS pre-commit AI slop check",
+    version
+)]
 struct Cli {
     /// Path to a diff file. If omitted, reads from stdin.
     #[arg(long)]
@@ -68,7 +72,10 @@ async fn main() -> ExitCode {
     };
 
     if cli.json {
-        println!("{}", serde_json::to_string_pretty(&output).unwrap_or_default());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&output).unwrap_or_default()
+        );
     } else {
         print!("{}", output.render_terminal());
     }

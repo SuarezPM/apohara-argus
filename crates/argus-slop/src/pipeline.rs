@@ -1,12 +1,12 @@
 //! AnalysisPipeline — orchestrates the 4 analyzers in parallel.
 
 use super::architecture::ArchReport;
+use super::deterministic::{run_deterministic_rules, SlopSignal};
 use super::security::SecurityReport;
 use super::slop_detector::SlopReport;
 use super::verdict::VerdictSynthesizer;
-use super::deterministic::{run_deterministic_rules, SlopSignal};
 use super::Analyzer;
-use argus_core::{Verdict, VerdictStatus, RiskScore};
+use argus_core::{RiskScore, Verdict, VerdictStatus};
 use argus_llm::LlmClient;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -103,7 +103,10 @@ impl AnalysisPipeline {
         let arch = arch.as_ref().unwrap();
 
         // Decision logic from the prompt
-        let status = if matches!(sec.highest_severity, super::security::SecuritySeverity::Critical | super::security::SecuritySeverity::High) {
+        let status = if matches!(
+            sec.highest_severity,
+            super::security::SecuritySeverity::Critical | super::security::SecuritySeverity::High
+        ) {
             VerdictStatus::Halted
         } else if slop.slop_score > 0.7 && arch.fit_score > 0.5 {
             VerdictStatus::Halted
@@ -116,24 +119,45 @@ impl AnalysisPipeline {
         };
 
         // Aggregate risk score (weighted average)
-        let risk = (slop.slop_score * 0.4 + arch.fit_score * 0.4
-            + (sec.findings.len() as f32 * 0.05).min(0.2)).clamp(0.0, 1.0);
+        let risk = (slop.slop_score * 0.4
+            + arch.fit_score * 0.4
+            + (sec.findings.len() as f32 * 0.05).min(0.2))
+        .clamp(0.0, 1.0);
 
         let summary = format!(
             "Slop score: {:.2}, Arch fit: {:.2}, Security: {}. Decision: {:?}.",
             slop.slop_score, arch.fit_score, sec.summary, status
         );
         let key_findings = vec![
-            format!("AI slop signals: {} (score {:.2})", slop.signals_detected.len(), slop.slop_score),
+            format!(
+                "AI slop signals: {} (score {:.2})",
+                slop.signals_detected.len(),
+                slop.slop_score
+            ),
             format!("Architecture fit: {:.2} — {}", arch.fit_score, arch.verdict),
-            format!("Security: {} findings, highest {:?}", sec.findings.len(), sec.highest_severity),
+            format!(
+                "Security: {} findings, highest {:?}",
+                sec.findings.len(),
+                sec.highest_severity
+            ),
         ];
-        let action_items = sec.findings.iter().take(3).map(|f| f.recommendation.clone()).collect();
+        let action_items = sec
+            .findings
+            .iter()
+            .take(3)
+            .map(|f| f.recommendation.clone())
+            .collect();
 
         self.verdict.to_verdict(
-            status, risk, summary, key_findings, action_items,
-            format!("Heuristic synthesis: slop={:.2} arch={:.2} sec={:?}",
-                slop.slop_score, arch.fit_score, sec.highest_severity),
+            status,
+            risk,
+            summary,
+            key_findings,
+            action_items,
+            format!(
+                "Heuristic synthesis: slop={:.2} arch={:.2} sec={:?}",
+                slop.slop_score, arch.fit_score, sec.highest_severity
+            ),
         )
     }
 }

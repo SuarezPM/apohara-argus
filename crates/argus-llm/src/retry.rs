@@ -176,7 +176,11 @@ mod tests {
         let elapsed = start.elapsed();
         assert!(r.is_ok(), "4th attempt should succeed: {:?}", r);
         assert_eq!(mock.call_count(), 4);
-        assert!(elapsed >= Duration::ZERO, "elapsed was negative: {:?}", elapsed);
+        assert!(
+            elapsed >= Duration::ZERO,
+            "elapsed was negative: {:?}",
+            elapsed
+        );
     }
 
     /// When jitter is OFF, the sleep is exactly the exponential window.

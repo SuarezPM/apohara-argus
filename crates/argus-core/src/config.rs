@@ -34,12 +34,18 @@ impl Config {
             nim_default_model: env::var("ARGUS_NIM_MODEL")
                 .unwrap_or_else(|_| "meta/llama-3.1-70b-instruct".into()),
             api_port: env::var("ARGUS_API_PORT")
-                .ok().and_then(|s| s.parse().ok()).unwrap_or(8080),
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(8080),
             dashboard_port: env::var("ARGUS_DASHBOARD_PORT")
-                .ok().and_then(|s| s.parse().ok()).unwrap_or(3000),
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(3000),
             log_level: env::var("ARGUS_LOG").unwrap_or_else(|_| "info".into()),
             retention_days: env::var("ARGUS_RETENTION_DAYS")
-                .ok().and_then(|s| s.parse().ok()).unwrap_or(365),
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(365),
         })
     }
 
@@ -49,7 +55,9 @@ impl Config {
             return Err(ArgusError::Config("DATABASE_URL is empty".into()));
         }
         if !self.nim_base_url.starts_with("http") {
-            return Err(ArgusError::Config("ARGUS_NIM_BASE_URL must be a URL".into()));
+            return Err(ArgusError::Config(
+                "ARGUS_NIM_BASE_URL must be a URL".into(),
+            ));
         }
         Ok(())
     }
@@ -58,11 +66,15 @@ impl Config {
 fn dotenv_load() -> std::io::Result<()> {
     use std::fs;
     let path = std::path::Path::new(".env");
-    if !path.exists() { return Ok(()); }
+    if !path.exists() {
+        return Ok(());
+    }
     let content = fs::read_to_string(path)?;
     for line in content.lines() {
         let line = line.trim();
-        if line.is_empty() || line.starts_with('#') { continue; }
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
         if let Some((k, v)) = line.split_once('=') {
             let k = k.trim();
             let v = v.trim().trim_matches('"').trim_matches('\'');
@@ -87,7 +99,9 @@ mod tests {
         let prev = std::env::var("ARGUS_NIM_BASE_URL").ok();
         std::env::remove_var("ARGUS_NIM_BASE_URL");
         let c = Config::from_env().expect("load");
-        if let Some(v) = prev { std::env::set_var("ARGUS_NIM_BASE_URL", v); }
+        if let Some(v) = prev {
+            std::env::set_var("ARGUS_NIM_BASE_URL", v);
+        }
         assert!(!c.nim_base_url.is_empty());
         assert!(c.api_port > 0);
     }
@@ -99,7 +113,9 @@ mod tests {
         std::env::remove_var("ARGUS_RETENTION_DAYS");
         let c = Config::from_env().expect("load");
         assert_eq!(c.retention_days, 365);
-        if let Some(v) = prev { std::env::set_var("ARGUS_RETENTION_DAYS", v); }
+        if let Some(v) = prev {
+            std::env::set_var("ARGUS_RETENTION_DAYS", v);
+        }
 
         // Env override: 90.
         // SAFETY: single-threaded test.

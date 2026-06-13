@@ -12,19 +12,19 @@
 //! - `ArchitectureFit` — coherence with the repo
 //! - `VerdictSynthesizer` — final verdict from the other 3 outputs
 
-pub mod slop_detector;
-pub mod security;
 pub mod architecture;
-pub mod verdict;
-pub mod pipeline;
 pub mod deterministic;
+pub mod pipeline;
+pub mod security;
+pub mod slop_detector;
+pub mod verdict;
 
-pub use slop_detector::{SlopDetector, SlopReport};
-pub use security::{SecurityReview, SecurityReport, SecurityFinding};
-pub use architecture::{ArchitectureFit, ArchReport};
-pub use verdict::{VerdictSynthesizer, SynthesizerInput};
+pub use architecture::{ArchReport, ArchitectureFit};
+pub use deterministic::{run_deterministic_rules, Severity, SlopSignal, OVERSIZED_FN_LOC};
 pub use pipeline::{AnalysisPipeline, PipelineOutput};
-pub use deterministic::{run_deterministic_rules, SlopSignal, Severity, OVERSIZED_FN_LOC};
+pub use security::{SecurityFinding, SecurityReport, SecurityReview};
+pub use slop_detector::{SlopDetector, SlopReport};
+pub use verdict::{SynthesizerInput, VerdictSynthesizer};
 
 use argus_core::{PRFinding, Result as ArgusResult};
 use argus_llm::LlmClient;
@@ -42,11 +42,15 @@ pub enum SlopError {
 }
 
 impl From<argus_llm::LlmError> for SlopError {
-    fn from(e: argus_llm::LlmError) -> Self { Self::Llm(e.to_string()) }
+    fn from(e: argus_llm::LlmError) -> Self {
+        Self::Llm(e.to_string())
+    }
 }
 
 impl From<argus_core::ArgusError> for SlopError {
-    fn from(e: argus_core::ArgusError) -> Self { Self::Prompt(e.to_string()) }
+    fn from(e: argus_core::ArgusError) -> Self {
+        Self::Prompt(e.to_string())
+    }
 }
 
 /// Common trait for all analyzers.
@@ -72,8 +76,9 @@ pub trait Analyzer: Send + Sync {
         api_key: &str,
     ) -> Result<Self::Output, SlopError> {
         let lib = argus_core::PromptLibrary::load_embedded()?;
-        let prompt = lib.get(self.prompt_name())
-            .ok_or_else(|| SlopError::Prompt(format!("prompt '{}' not found", self.prompt_name())))?;
+        let prompt = lib.get(self.prompt_name()).ok_or_else(|| {
+            SlopError::Prompt(format!("prompt '{}' not found", self.prompt_name()))
+        })?;
         let user_msg = self.build_user_message(diff, context);
         let resp = client
             .complete_one_shot(

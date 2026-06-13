@@ -30,7 +30,7 @@ pub struct Layer {
     pub file: String,
     pub line_start: u32,
     pub line_end: u32,
-    pub severity: String, // "info" | "warning" | "error" | "critical"
+    pub severity: String,   // "info" | "warning" | "error" | "critical"
     pub diff_range: String, // a snippet of the diff
 }
 

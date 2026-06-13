@@ -42,7 +42,10 @@ async fn main() -> anyhow::Result<()> {
     // subscriber is already set.
     let _otel_guard = argus_otel::init("argus-github-app");
     let _ = tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,argus=debug")))
+        .with_env_filter(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::new("info,argus=debug")),
+        )
         .try_init();
 
     // Required config: the webhook secret. We fail loudly at
@@ -66,7 +69,9 @@ async fn main() -> anyhow::Result<()> {
     // it. We just log whether it's set so operators can spot
     // the misconfiguration in the boot logs.
     match std::env::var("ARGUS_APP_INSTALL_TOKEN") {
-        Ok(t) if !t.is_empty() => tracing::info!("ARGUS_APP_INSTALL_TOKEN: present (length {})", t.len()),
+        Ok(t) if !t.is_empty() => {
+            tracing::info!("ARGUS_APP_INSTALL_TOKEN: present (length {})", t.len())
+        }
         _ => tracing::warn!("ARGUS_APP_INSTALL_TOKEN not set; webhooks will fail until it is"),
     }
 

@@ -25,9 +25,13 @@ pub enum Decision {
 
 impl Decision {
     pub fn from_risk(risk: f32) -> Self {
-        if risk >= 0.7 { Decision::Block }
-        else if risk >= 0.3 { Decision::Warn }
-        else { Decision::Allow }
+        if risk >= 0.7 {
+            Decision::Block
+        } else if risk >= 0.3 {
+            Decision::Warn
+        } else {
+            Decision::Allow
+        }
     }
     pub fn exit_code(self) -> i32 {
         match self {
@@ -64,7 +68,10 @@ pub struct GuardRunner {
 
 impl GuardRunner {
     pub fn new(nim_key: impl Into<String>) -> Self {
-        Self { nim_key: nim_key.into(), nim_model: None }
+        Self {
+            nim_key: nim_key.into(),
+            nim_model: None,
+        }
     }
 
     pub fn with_model(mut self, m: impl Into<String>) -> Self {
@@ -94,23 +101,38 @@ impl GuardRunner {
         let pipeline = AnalysisPipeline::new();
         // The pipeline returns PipelineOutput directly; failures inside an
         // individual analyzer are captured as None in the output.
-        let out = pipeline.run(&client, "local/pre-commit", diff, None, &self.nim_key).await;
+        let out = pipeline
+            .run(&client, "local/pre-commit", diff, None, &self.nim_key)
+            .await;
 
         let risk = out.verdict.risk_score.as_f32();
         let decision = Decision::from_risk(risk);
         let slop_score = out.slop.as_ref().map(|s| s.slop_score).unwrap_or(0.5);
-        let fit_score = out.architecture.as_ref().map(|a| a.fit_score).unwrap_or(0.5);
-        let sec_sum = out.security.as_ref()
-            .map(|s| format!("{} findings, highest {:?}", s.findings.len(), s.highest_severity))
+        let fit_score = out
+            .architecture
+            .as_ref()
+            .map(|a| a.fit_score)
+            .unwrap_or(0.5);
+        let sec_sum = out
+            .security
+            .as_ref()
+            .map(|s| {
+                format!(
+                    "{} findings, highest {:?}",
+                    s.findings.len(),
+                    s.highest_severity
+                )
+            })
             .unwrap_or_else(|| "no security report".into());
 
         // If all 3 analyzers failed (the defensive default), we treat as BLOCK
         // regardless of the risk score from the synthesizer.
-        let final_decision = if out.slop.is_none() && out.security.is_none() && out.architecture.is_none() {
-            Decision::Block
-        } else {
-            decision
-        };
+        let final_decision =
+            if out.slop.is_none() && out.security.is_none() && out.architecture.is_none() {
+                Decision::Block
+            } else {
+                decision
+            };
 
         Ok(GuardOutput {
             decision: final_decision,
@@ -135,11 +157,17 @@ impl GuardOutput {
             Decision::Warn => "⚠️ ",
             Decision::Block => "🛑",
         };
-        s.push_str(&format!("\n{} ARGUS Guard: {}\n", icon, self.decision.as_str()));
+        s.push_str(&format!(
+            "\n{} ARGUS Guard: {}\n",
+            icon,
+            self.decision.as_str()
+        ));
         s.push_str(&format!("   Risk score: {:.2} / 1.00\n", self.risk_score));
         s.push_str(&format!("   Status: {:?}\n", self.verdict_status));
-        s.push_str(&format!("   Slop: {:.2}  |  Arch fit: {:.2}  |  Sec: {}\n",
-            self.slop_score, self.fit_score, self.security_summary));
+        s.push_str(&format!(
+            "   Slop: {:.2}  |  Arch fit: {:.2}  |  Sec: {}\n",
+            self.slop_score, self.fit_score, self.security_summary
+        ));
         s.push_str(&format!("\n   {}\n", self.summary));
         if !self.key_findings.is_empty() {
             s.push_str("\n   Findings:\n");

@@ -129,9 +129,7 @@ mod tests {
         let body = json!({ "verdict": "approved", "risk": 0.1 });
 
         assert!(cache.get("abc", "sha1").await.is_none());
-        cache
-            .put("abc".into(), "sha1".into(), body.clone())
-            .await;
+        cache.put("abc".into(), "sha1".into(), body.clone()).await;
 
         let got = cache.get("abc", "sha1").await.expect("cache hit");
         assert_eq!(got, body);
@@ -155,9 +153,7 @@ mod tests {
         // 1ms TTL: even with a fast clock, the entry is dead by the
         // time we sleep 10ms.
         let cache = IdempotencyCache::with_ttl(Duration::from_millis(1));
-        cache
-            .put("k".into(), "p".into(), json!({ "v": 1 }))
-            .await;
+        cache.put("k".into(), "p".into(), json!({ "v": 1 })).await;
 
         tokio::time::sleep(Duration::from_millis(10)).await;
 

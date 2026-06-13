@@ -20,10 +20,10 @@ use thiserror::Error;
 
 pub mod audit;
 pub mod circuit_breaker;
+pub mod mock;
 pub mod model_registry;
 pub mod nim;
 pub mod openai_compat;
-pub mod mock;
 pub mod retry;
 
 #[cfg(test)]
@@ -38,9 +38,9 @@ pub mod dalle;
 pub mod heygen;
 
 pub use circuit_breaker::{CircuitBreakerConfig, CircuitError, CircuitState, LlmCircuitBreaker};
+pub use mock::MockClient;
 pub use nim::NimClient;
 pub use openai_compat::OpenAICompatClient;
-pub use mock::MockClient;
 pub use retry::{RetryClient, RetryConfig};
 
 #[derive(Error, Debug, Clone)]
@@ -98,13 +98,22 @@ pub enum Role {
 
 impl Message {
     pub fn system(content: impl Into<String>) -> Self {
-        Self { role: Role::System, content: content.into() }
+        Self {
+            role: Role::System,
+            content: content.into(),
+        }
     }
     pub fn user(content: impl Into<String>) -> Self {
-        Self { role: Role::User, content: content.into() }
+        Self {
+            role: Role::User,
+            content: content.into(),
+        }
     }
     pub fn assistant(content: impl Into<String>) -> Self {
-        Self { role: Role::Assistant, content: content.into() }
+        Self {
+            role: Role::Assistant,
+            content: content.into(),
+        }
     }
 }
 
@@ -134,8 +143,14 @@ impl CompletionRequest {
             stop: None,
         }
     }
-    pub fn with_temperature(mut self, t: f32) -> Self { self.temperature = Some(t); self }
-    pub fn with_max_tokens(mut self, n: u32) -> Self { self.max_tokens = Some(n); self }
+    pub fn with_temperature(mut self, t: f32) -> Self {
+        self.temperature = Some(t);
+        self
+    }
+    pub fn with_max_tokens(mut self, n: u32) -> Self {
+        self.max_tokens = Some(n);
+        self
+    }
 }
 
 /// Completion response from an LLM.
@@ -160,7 +175,11 @@ pub trait LlmClient: Send + Sync {
     fn provider_name(&self) -> &str;
 
     /// Send a completion request. Returns the response or an error.
-    async fn complete(&self, request: CompletionRequest, api_key: &str) -> Result<CompletionResponse, LlmError>;
+    async fn complete(
+        &self,
+        request: CompletionRequest,
+        api_key: &str,
+    ) -> Result<CompletionResponse, LlmError>;
 
     /// Convenience: single-turn completion (system + user).
     async fn complete_one_shot(
@@ -172,12 +191,9 @@ pub trait LlmClient: Send + Sync {
         temperature: f32,
         max_tokens: u32,
     ) -> Result<CompletionResponse, LlmError> {
-        let req = CompletionRequest::new(model, vec![
-            Message::system(system),
-            Message::user(user),
-        ])
-        .with_temperature(temperature)
-        .with_max_tokens(max_tokens);
+        let req = CompletionRequest::new(model, vec![Message::system(system), Message::user(user)])
+            .with_temperature(temperature)
+            .with_max_tokens(max_tokens);
         self.complete(req, api_key).await
     }
 }

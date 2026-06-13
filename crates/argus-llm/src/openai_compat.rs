@@ -181,11 +181,14 @@ impl LlmClient for OpenAICompatClient {
             .map(|c| c.message.content)
             .ok_or_else(|| LlmError::Parse("no choices in response".into()))?;
 
-        let usage = parsed.usage.map(|u| Usage {
-            prompt_tokens: u.prompt_tokens,
-            completion_tokens: u.completion_tokens,
-            total_tokens: u.total_tokens,
-        }).unwrap_or_default();
+        let usage = parsed
+            .usage
+            .map(|u| Usage {
+                prompt_tokens: u.prompt_tokens,
+                completion_tokens: u.completion_tokens,
+                total_tokens: u.total_tokens,
+            })
+            .unwrap_or_default();
 
         Ok(CompletionResponse {
             content,

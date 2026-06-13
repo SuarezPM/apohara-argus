@@ -23,53 +23,75 @@ diff --git a/src/config.py b/src/config.py
 "#;
 
 fn load_key() -> Option<String> {
-    std::env::var("ARGUS_NIM_KEY").ok().filter(|s| !s.is_empty())
+    std::env::var("ARGUS_NIM_KEY")
+        .ok()
+        .filter(|s| !s.is_empty())
 }
 
 #[tokio::test]
 #[ignore = "requires ARGUS_NIM_KEY and internet"]
 async fn raw_security_call_works() {
-    let Some(key) = load_key() else { return; };
+    let Some(key) = load_key() else {
+        return;
+    };
     let client = NimClient::new();
     let lib = argus_core::PromptLibrary::load_embedded().expect("load");
     let prompt = lib.get("redteam-security").expect("prompt");
     let diff = FAKE_SECRET_DIFF;
-    let resp = client.complete_one_shot(
-        &prompt.metadata.model,
-        &prompt.body,
-        &format!("Review this diff:\n```diff\n{}\n```", diff),
-        &key,
-        prompt.metadata.temperature,
-        prompt.metadata.max_tokens,
-    ).await.expect("llm call");
-    eprintln!("\n=== RAW SECURITY RESPONSE (first 600 chars) ===\n{}\n=== END ===\n", &resp.content[..resp.content.len().min(600)]);
+    let resp = client
+        .complete_one_shot(
+            &prompt.metadata.model,
+            &prompt.body,
+            &format!("Review this diff:\n```diff\n{}\n```", diff),
+            &key,
+            prompt.metadata.temperature,
+            prompt.metadata.max_tokens,
+        )
+        .await
+        .expect("llm call");
+    eprintln!(
+        "\n=== RAW SECURITY RESPONSE (first 600 chars) ===\n{}\n=== END ===\n",
+        &resp.content[..resp.content.len().min(600)]
+    );
 }
 
 #[tokio::test]
 #[ignore = "requires ARGUS_NIM_KEY and internet"]
 async fn raw_slop_call_works() {
-    let Some(key) = load_key() else { return; };
+    let Some(key) = load_key() else {
+        return;
+    };
     let client = NimClient::new();
     let lib = argus_core::PromptLibrary::load_embedded().expect("load");
     let prompt = lib.get("slop-detector").expect("prompt");
     let diff = FAKE_SECRET_DIFF;
-    let resp = client.complete_one_shot(
-        &prompt.metadata.model,
-        &prompt.body,
-        &format!("Analyze this diff:\n```diff\n{}\n```", diff),
-        &key,
-        prompt.metadata.temperature,
-        prompt.metadata.max_tokens,
-    ).await.expect("llm call");
-    eprintln!("\n=== RAW SLOP RESPONSE (first 600 chars) ===\n{}\n=== END ===\n", &resp.content[..resp.content.len().min(600)]);
+    let resp = client
+        .complete_one_shot(
+            &prompt.metadata.model,
+            &prompt.body,
+            &format!("Analyze this diff:\n```diff\n{}\n```", diff),
+            &key,
+            prompt.metadata.temperature,
+            prompt.metadata.max_tokens,
+        )
+        .await
+        .expect("llm call");
+    eprintln!(
+        "\n=== RAW SLOP RESPONSE (first 600 chars) ===\n{}\n=== END ===\n",
+        &resp.content[..resp.content.len().min(600)]
+    );
 }
 
 #[tokio::test]
 #[ignore = "requires ARGUS_NIM_KEY and internet"]
 async fn pipeline_runs_end_to_end() {
-    let Some(key) = load_key() else { return; };
+    let Some(key) = load_key() else {
+        return;
+    };
     let client = NimClient::new();
     let pipeline = AnalysisPipeline::new();
-    let out = pipeline.run(&client, "owner/repo#1", FAKE_SECRET_DIFF, None, &key).await;
+    let out = pipeline
+        .run(&client, "owner/repo#1", FAKE_SECRET_DIFF, None, &key)
+        .await;
     eprintln!("\n=== Pipeline output ===\n{:#?}\n", out);
 }

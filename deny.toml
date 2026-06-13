@@ -15,7 +15,6 @@ allow = [
     "BSD-2-Clause",
     "BSD-3-Clause",
     "ISC",
-    "Unicode-DFS-2016",
     "Unicode-3.0",
     "Zlib",
     # CDLA-Permissive-2.0 is a permissive *data* license (no copyleft, no

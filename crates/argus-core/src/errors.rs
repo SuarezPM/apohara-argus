@@ -32,5 +32,7 @@ pub enum ArgusError {
 }
 
 impl From<sqlx::Error> for ArgusError {
-    fn from(e: sqlx::Error) -> Self { Self::Database(e.to_string()) }
+    fn from(e: sqlx::Error) -> Self {
+        Self::Database(e.to_string())
+    }
 }

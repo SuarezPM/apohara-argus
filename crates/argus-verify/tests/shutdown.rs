@@ -59,9 +59,9 @@ async fn sigterm_triggers_graceful_shutdown() {
     match timeout(Duration::from_secs(5), handle).await {
         Ok(Ok(())) => {} // graceful shutdown completed cleanly
         Ok(Err(e)) => panic!("server task panicked on SIGTERM: {e}"),
-        Err(_) => panic!(
-            "graceful shutdown did not complete within 5s after SIGTERM (addr={addr})"
-        ),
+        Err(_) => {
+            panic!("graceful shutdown did not complete within 5s after SIGTERM (addr={addr})")
+        }
     }
 }
 
@@ -78,9 +78,7 @@ async fn sigint_triggers_graceful_shutdown() {
     match timeout(Duration::from_secs(5), handle).await {
         Ok(Ok(())) => {} // graceful shutdown completed cleanly
         Ok(Err(e)) => panic!("server task panicked on SIGINT: {e}"),
-        Err(_) => panic!(
-            "graceful shutdown did not complete within 5s after SIGINT (addr={addr})"
-        ),
+        Err(_) => panic!("graceful shutdown did not complete within 5s after SIGINT (addr={addr})"),
     }
 }
 
@@ -125,12 +123,7 @@ fn no_unshielded_axum_serve_in_workspace() {
             if window.contains(".with_graceful_shutdown") {
                 continue;
             }
-            offenders.push(format!(
-                "{}:{}  |  {}",
-                path.display(),
-                i + 1,
-                line.trim()
-            ));
+            offenders.push(format!("{}:{}  |  {}", path.display(), i + 1, line.trim()));
         }
     }
 

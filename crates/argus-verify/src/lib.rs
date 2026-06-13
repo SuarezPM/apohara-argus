@@ -10,7 +10,9 @@
 //! If a GitHub token is configured, the worker will also post a comment
 //! and set a label on the PR.
 
-use argus_core::{ArgusError, DataClass, DecisionArtifact, FixPlan, PRReview, Verdict, VerdictStatus, RiskScore};
+use argus_core::{
+    ArgusError, DataClass, DecisionArtifact, FixPlan, PRReview, RiskScore, Verdict, VerdictStatus,
+};
 use argus_crypto::chain::append;
 use argus_crypto::identity::AgentKeypair;
 use argus_github::GitHubClient;
@@ -27,7 +29,10 @@ pub mod routes;
 pub mod shutdown;
 pub use audit_store::InMemoryAuditStore;
 pub use cache::IdempotencyCache;
-pub use routes::{audit_export_handler, a2a_message_handler, agent_card_handler, build_agent_card, AgentCard, A2AMessage, A2APart, AgentSkill};
+pub use routes::{
+    a2a_message_handler, agent_card_handler, audit_export_handler, build_agent_card, A2AMessage,
+    A2APart, AgentCard, AgentSkill,
+};
 pub use shutdown::shutdown_signal;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,9 +112,7 @@ impl VerifyWorker {
             prev_hash: Arc::new(Mutex::new(WORKER_GENESIS)),
             audit_store: InMemoryAuditStore::new(),
             audit_prev_hash: Arc::new(Mutex::new(WORKER_GENESIS)),
-            audit_signing_key: ed25519_dalek::SigningKey::generate(
-                &mut rand::rngs::OsRng,
-            ),
+            audit_signing_key: ed25519_dalek::SigningKey::generate(&mut rand::rngs::OsRng),
         }
     }
 
@@ -125,10 +128,7 @@ impl VerifyWorker {
     }
 
     /// Process a PR review request end-to-end.
-    pub async fn analyze(
-        &self,
-        request: AnalyzeRequest,
-    ) -> Result<AnalyzeResponse, ArgusError> {
+    pub async fn analyze(&self, request: AnalyzeRequest) -> Result<AnalyzeResponse, ArgusError> {
         // Parse the PR URL
         let (owner, repo, number) = GitHubClient::parse_pr_url(&request.pr_url)
             .map_err(|e| ArgusError::InvalidInput(format!("invalid PR URL: {}", e)))?;
@@ -136,11 +136,12 @@ impl VerifyWorker {
 
         // Fetch the diff (if we have a GitHub client)
         let diff = if let Some(gh) = &self.github {
-            gh.get_diff(&owner, &repo, number).await
+            gh.get_diff(&owner, &repo, number)
+                .await
                 .map_err(|e| ArgusError::Internal(format!("github diff fetch: {}", e)))?
         } else {
             return Err(ArgusError::InvalidInput(
-                "No GitHub client configured; cannot fetch diff. Provide GITHUB_TOKEN.".into()
+                "No GitHub client configured; cannot fetch diff. Provide GITHUB_TOKEN.".into(),
             ));
         };
 
@@ -150,13 +151,26 @@ impl VerifyWorker {
         // set it via env. For simplicity, we expect ARGUS_NIM_KEY to be set.
         let nim_key = std::env::var("ARGUS_NIM_KEY")
             .map_err(|_| ArgusError::Internal("ARGUS_NIM_KEY not set on server (BYOK required in X-LLM-Key header — server has fallback env)".into()))?;
-        let out = pipeline.run(&self.nim, &pr_ref, &diff, request.repo_context.as_deref(), &nim_key).await;
+        let out = pipeline
+            .run(
+                &self.nim,
+                &pr_ref,
+                &diff,
+                request.repo_context.as_deref(),
+                &nim_key,
+            )
+            .await;
 
         let risk = out.verdict.risk_score.as_f32();
         let slop_score = out.slop.as_ref().map(|s| s.slop_score);
         let fit_score = out.architecture.as_ref().map(|a| a.fit_score);
-        let sec_sum = out.security.as_ref()
-            .map(|s| format!("{} findings, highest {:?}", s.findings.len(), s.highest_severity));
+        let sec_sum = out.security.as_ref().map(|s| {
+            format!(
+                "{} findings, highest {:?}",
+                s.findings.len(),
+                s.highest_severity
+            )
+        });
 
         // Build the signed review (for the audit trail).
         //
@@ -257,15 +271,15 @@ impl VerifyWorker {
         let audit_event = audit::emit_audit_event(
             &self.nim_model,
             "verify-worker-v1",
-            &diff, // prompt_text — fingerprinted and dropped, never stored
+            &diff,                // prompt_text — fingerprinted and dropped, never stored
             &out.verdict.summary, // raw_response — same posture
-            0.7, // temperature — the worker's default for verdict synthesis
-            vec![], // tool_calls — verifier makes no tool calls in this iteration
+            0.7,                  // temperature — the worker's default for verdict synthesis
+            vec![],               // tool_calls — verifier makes no tool calls in this iteration
             decision,
             audit_prev,
             None,
             None,
-            DataClass::SourceCode, // EU AI Act L2: PR diffs are source code
+            DataClass::SourceCode,     // EU AI Act L2: PR diffs are source code
             "verify-worker-v1-policy", // policy_version
             &self.audit_signing_key,
         );

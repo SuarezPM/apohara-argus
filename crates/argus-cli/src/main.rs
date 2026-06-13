@@ -21,7 +21,12 @@ struct Cli {
     nim_key: String,
 
     /// Override the LLM model.
-    #[arg(long, env = "ARGUS_NIM_MODEL", global = true, default_value = "meta/llama-3.1-70b-instruct")]
+    #[arg(
+        long,
+        env = "ARGUS_NIM_MODEL",
+        global = true,
+        default_value = "meta/llama-3.1-70b-instruct"
+    )]
     nim_model: String,
 
     #[command(subcommand)]
@@ -69,7 +74,9 @@ async fn main() -> ExitCode {
     // The `try_init` is a no-op when OTel is disabled.
     let _otel_guard = argus_otel::init("argus-cli");
     let _ = tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
         .try_init();
     let cli = Cli::parse();
 
@@ -84,11 +91,17 @@ async fn main() -> ExitCode {
             let runner = argus_guard::GuardRunner::new(&cli.nim_key).with_model(&cli.nim_model);
             let d = match argus_guard::GuardRunner::read_diff(diff.as_ref()) {
                 Ok(d) => d,
-                Err(e) => { eprintln!("Error: {}", e); return ExitCode::from(2); }
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    return ExitCode::from(2);
+                }
             };
             let out = match runner.run(&d).await {
                 Ok(o) => o,
-                Err(e) => { eprintln!("Pipeline error: {}", e); return ExitCode::from(2); }
+                Err(e) => {
+                    eprintln!("Pipeline error: {}", e);
+                    return ExitCode::from(2);
+                }
             };
             if json {
                 println!("{}", serde_json::to_string_pretty(&out).unwrap());
@@ -97,7 +110,12 @@ async fn main() -> ExitCode {
             }
             ExitCode::from(out.decision.exit_code() as u8)
         }
-        Cmd::Verify { pr_url, post_comment, set_labels, json } => {
+        Cmd::Verify {
+            pr_url,
+            post_comment,
+            set_labels,
+            json,
+        } => {
             let gh_token = std::env::var("GITHUB_TOKEN").ok().filter(|s| !s.is_empty());
             let worker = if let Some(tok) = gh_token {
                 argus_verify::VerifyWorker::new(&cli.nim_key)
@@ -114,7 +132,10 @@ async fn main() -> ExitCode {
             };
             let resp = match worker.analyze(req).await {
                 Ok(r) => r,
-                Err(e) => { eprintln!("Error: {}", e); return ExitCode::from(2); }
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    return ExitCode::from(2);
+                }
             };
             if json {
                 println!("{}", serde_json::to_string_pretty(&resp).unwrap());
@@ -124,11 +145,20 @@ async fn main() -> ExitCode {
                 eprintln!("Status: {:?}", resp.verdict.status);
                 eprintln!("Risk: {:.2}", resp.verdict.risk_score.as_f32());
                 eprintln!("Summary: {}", resp.verdict.summary);
-                eprintln!("Slop: {} | Fit: {} | Sec: {}",
-                    resp.slop_score.map(|s| format!("{:.2}", s)).unwrap_or("n/a".into()),
-                    resp.fit_score.map(|s| format!("{:.2}", s)).unwrap_or("n/a".into()),
-                    resp.security_summary.as_deref().unwrap_or("n/a"));
-                eprintln!("Comment posted: {} | Labels set: {}", resp.comment_posted, resp.labels_set);
+                eprintln!(
+                    "Slop: {} | Fit: {} | Sec: {}",
+                    resp.slop_score
+                        .map(|s| format!("{:.2}", s))
+                        .unwrap_or("n/a".into()),
+                    resp.fit_score
+                        .map(|s| format!("{:.2}", s))
+                        .unwrap_or("n/a".into()),
+                    resp.security_summary.as_deref().unwrap_or("n/a")
+                );
+                eprintln!(
+                    "Comment posted: {} | Labels set: {}",
+                    resp.comment_posted, resp.labels_set
+                );
                 eprintln!("\nFindings:");
                 for f in &resp.verdict.key_findings {
                     eprintln!("  - {}", f);
@@ -146,18 +176,28 @@ async fn main() -> ExitCode {
             };
             ExitCode::from(exit as u8)
         }
-        Cmd::Lens { org, mock_prs, output } => {
+        Cmd::Lens {
+            org,
+            mock_prs,
+            output,
+        } => {
             use argus_lens::{LensRunner, PRBriefSummary};
             let prs: Vec<PRBriefSummary> = if !mock_prs.is_empty() {
-                mock_prs.iter().enumerate().map(|(i, pr_ref)| {
-                    PRBriefSummary {
+                mock_prs
+                    .iter()
+                    .enumerate()
+                    .map(|(i, pr_ref)| PRBriefSummary {
                         pr_ref: pr_ref.clone(),
                         author: format!("dev{}", i + 1),
                         risk_score: 0.2 + (i as f32 * 0.15) % 0.8,
-                        top_finding: if i == 0 { "hardcoded secret in config.py".into() } else { "minor AI slop signals".into() },
+                        top_finding: if i == 0 {
+                            "hardcoded secret in config.py".into()
+                        } else {
+                            "minor AI slop signals".into()
+                        },
                         critical_findings: if i == 0 { 1 } else { 0 },
-                    }
-                }).collect()
+                    })
+                    .collect()
             } else {
                 eprintln!("Use --mock-prs to seed demo data");
                 return ExitCode::from(2);
@@ -176,7 +216,10 @@ async fn main() -> ExitCode {
                     println!("\n{}", out.markdown);
                     ExitCode::from(0)
                 }
-                Err(e) => { eprintln!("Lens run failed: {}", e); ExitCode::from(2) }
+                Err(e) => {
+                    eprintln!("Lens run failed: {}", e);
+                    ExitCode::from(2)
+                }
             }
         }
         Cmd::Prompts => {
@@ -186,7 +229,10 @@ async fn main() -> ExitCode {
                 if let Some(p) = lib.get(name) {
                     eprintln!("▸ {} ({})", p.metadata.name, p.metadata.model);
                     eprintln!("  {}", p.metadata.description);
-                    eprintln!("  temp={} max_tokens={}\n", p.metadata.temperature, p.metadata.max_tokens);
+                    eprintln!(
+                        "  temp={} max_tokens={}\n",
+                        p.metadata.temperature, p.metadata.max_tokens
+                    );
                 }
             }
             ExitCode::from(0)
@@ -202,24 +248,33 @@ async fn main() -> ExitCode {
             eprintln!("{}", format_retention_line(config.retention_days));
             let client = argus_llm::NimClient::new();
             eprintln!("→ Testing NIM connectivity...");
-            let resp = client.complete_one_shot(
-                &cli.nim_model,
-                "You are a health-check echo. Reply with exactly 'ARGUS_OK'.",
-                "ping",
-                &cli.nim_key,
-                0.0, 16,
-            ).await;
+            let resp = client
+                .complete_one_shot(
+                    &cli.nim_model,
+                    "You are a health-check echo. Reply with exactly 'ARGUS_OK'.",
+                    "ping",
+                    &cli.nim_key,
+                    0.0,
+                    16,
+                )
+                .await;
             match resp {
                 Ok(r) => {
                     if r.content.contains("ARGUS_OK") {
                         eprintln!("✓ NIM healthy ({} tokens)", r.usage.total_tokens);
                         ExitCode::from(0)
                     } else {
-                        eprintln!("⚠ NIM responded but content unexpected: {}", r.content.trim());
+                        eprintln!(
+                            "⚠ NIM responded but content unexpected: {}",
+                            r.content.trim()
+                        );
                         ExitCode::from(1)
                     }
                 }
-                Err(e) => { eprintln!("✗ NIM failed: {}", e); ExitCode::from(2) }
+                Err(e) => {
+                    eprintln!("✗ NIM failed: {}", e);
+                    ExitCode::from(2)
+                }
             }
         }
     }

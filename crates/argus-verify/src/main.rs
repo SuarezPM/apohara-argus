@@ -18,7 +18,10 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use argus_verify::{a2a_message_handler, agent_card_handler, audit_export_handler, shutdown_signal, IdempotencyCache, VerifyWorker};
+use argus_verify::{
+    a2a_message_handler, agent_card_handler, audit_export_handler, shutdown_signal,
+    IdempotencyCache, VerifyWorker,
+};
 use axum::{
     extract::State,
     http::HeaderMap,
@@ -45,11 +48,16 @@ async fn main() -> anyhow::Result<()> {
     // Fallback fmt init for the case where OTel is disabled. Cheap when
     // OTel is on (the layer is a thin pass-through to stdout).
     let _ = tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,argus=debug")))
+        .with_env_filter(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::new("info,argus=debug")),
+        )
         .try_init();
 
     let port: u16 = std::env::var("ARGUS_API_PORT")
-        .ok().and_then(|s| s.parse().ok()).unwrap_or(8080);
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(8080);
 
     // GitHub client (optional, for posting comments)
     let worker = if let Ok(gh_token) = std::env::var("GITHUB_TOKEN") {
@@ -76,10 +84,7 @@ async fn main() -> anyhow::Result<()> {
                 interval.tick().await;
                 let removed = cache_for_cleanup.cleanup_expired().await;
                 if removed > 0 {
-                    tracing::info!(
-                        removed,
-                        "Cleaned up expired idempotency entries"
-                    );
+                    tracing::info!(removed, "Cleaned up expired idempotency entries");
                 }
             }
         });
@@ -164,27 +169,40 @@ async fn analyze(
                 pr_url = %req.pr_url,
                 "Returning cached verdict (idempotency hit)"
             );
-            let resp: argus_verify::AnalyzeResponse = serde_json::from_value(cached_body)
-                .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("cached verdict failed to deserialize: {}", e)))?;
+            let resp: argus_verify::AnalyzeResponse =
+                serde_json::from_value(cached_body).map_err(|e| {
+                    (
+                        axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("cached verdict failed to deserialize: {}", e),
+                    )
+                })?;
             return Ok(Json(resp));
         }
     }
 
     // BYOK: pull the NIM key from the X-LLM-Key header, fall back to env.
-    let nim_key = headers.get("x-llm-key")
+    let nim_key = headers
+        .get("x-llm-key")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
         .or_else(|| std::env::var("ARGUS_NIM_KEY").ok())
-        .ok_or_else(|| (axum::http::StatusCode::UNAUTHORIZED,
-            "BYOK required: pass your NVIDIA NIM key in the X-LLM-Key header".to_string()))?;
+        .ok_or_else(|| {
+            (
+                axum::http::StatusCode::UNAUTHORIZED,
+                "BYOK required: pass your NVIDIA NIM key in the X-LLM-Key header".to_string(),
+            )
+        })?;
 
     // Set the key as an env var so the worker can use it.
     // (In production we'd pass it through a different mechanism.)
     std::env::set_var("ARGUS_NIM_KEY", &nim_key);
 
-    let resp = state.worker.analyze(req.clone()).await
-        .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, format!("{}", e)))?;
+    let resp = state.worker.analyze(req.clone()).await.map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            format!("{}", e),
+        )
+    })?;
 
     // Populate the cache only if the caller opted into idempotency.
     // Failures to serialise for caching are non-fatal — we still

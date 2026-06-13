@@ -24,8 +24,7 @@ use argus_slop::{Analyzer, ArchitectureFit, SecurityReview, SlopDetector, Verdic
 use rmcp::{
     handler::server::{router::tool::ToolRouter, tool::Parameters},
     model::ServerInfo,
-    tool, tool_handler, tool_router,
-    ErrorData, ServerHandler,
+    tool, tool_handler, tool_router, ErrorData, ServerHandler,
 };
 use serde::{Deserialize, Serialize};
 
@@ -127,9 +126,9 @@ impl ArgusMcp {
         &self,
         Parameters(AegisArgs { code_diff }): Parameters<AegisArgs>,
     ) -> Result<String, ErrorData> {
-        let key = self.current_key().ok_or_else(|| {
-            Self::err("aegis_slop", "ARGUS_NIM_KEY not set (BYOK required)")
-        })?;
+        let key = self
+            .current_key()
+            .ok_or_else(|| Self::err("aegis_slop", "ARGUS_NIM_KEY not set (BYOK required)"))?;
         let start = Instant::now();
         let analyzer = SlopDetector::new();
         let report = analyzer
@@ -137,7 +136,11 @@ impl ArgusMcp {
             .await
             .map_err(|e| Self::wrap("aegis_slop", e))?;
         let findings = serde_json::to_value(&report).map_err(|e| Self::wrap("aegis_slop", e))?;
-        let summary = format!("{} slop signals (score {:.2})", report.signals_detected.len(), report.slop_score);
+        let summary = format!(
+            "{} slop signals (score {:.2})",
+            report.signals_detected.len(),
+            report.slop_score
+        );
         let report = SpecialistReport {
             specialist: "aegis_slop".into(),
             prompt_name: "slop-detector".into(),
@@ -160,17 +163,22 @@ impl ArgusMcp {
         &self,
         Parameters(AegisArgs { code_diff }): Parameters<AegisArgs>,
     ) -> Result<String, ErrorData> {
-        let key = self.current_key().ok_or_else(|| {
-            Self::err("aegis_security", "ARGUS_NIM_KEY not set (BYOK required)")
-        })?;
+        let key = self
+            .current_key()
+            .ok_or_else(|| Self::err("aegis_security", "ARGUS_NIM_KEY not set (BYOK required)"))?;
         let start = Instant::now();
         let analyzer = SecurityReview::new();
         let report = analyzer
             .run(&self.nim, &code_diff, None, &key)
             .await
             .map_err(|e| Self::wrap("aegis_security", e))?;
-        let findings = serde_json::to_value(&report).map_err(|e| Self::wrap("aegis_security", e))?;
-        let summary = format!("{} security findings (highest {:?})", report.findings.len(), report.highest_severity);
+        let findings =
+            serde_json::to_value(&report).map_err(|e| Self::wrap("aegis_security", e))?;
+        let summary = format!(
+            "{} security findings (highest {:?})",
+            report.findings.len(),
+            report.highest_severity
+        );
         let report = SpecialistReport {
             specialist: "aegis_security".into(),
             prompt_name: "redteam-security".into(),
@@ -193,9 +201,9 @@ impl ArgusMcp {
         &self,
         Parameters(AegisArgs { code_diff }): Parameters<AegisArgs>,
     ) -> Result<String, ErrorData> {
-        let key = self.current_key().ok_or_else(|| {
-            Self::err("aegis_arch", "ARGUS_NIM_KEY not set (BYOK required)")
-        })?;
+        let key = self
+            .current_key()
+            .ok_or_else(|| Self::err("aegis_arch", "ARGUS_NIM_KEY not set (BYOK required)"))?;
         let start = Instant::now();
         let analyzer = ArchitectureFit::new();
         let report = analyzer
@@ -233,9 +241,9 @@ impl ArgusMcp {
             diff,
         }): Parameters<VerdictArgs>,
     ) -> Result<String, ErrorData> {
-        let key = self.current_key().ok_or_else(|| {
-            Self::err("aegis_verdict", "ARGUS_NIM_KEY not set (BYOK required)")
-        })?;
+        let key = self
+            .current_key()
+            .ok_or_else(|| Self::err("aegis_verdict", "ARGUS_NIM_KEY not set (BYOK required)"))?;
         let start = Instant::now();
 
         // Parse the 3 pre-computed reports. If parsing fails, the

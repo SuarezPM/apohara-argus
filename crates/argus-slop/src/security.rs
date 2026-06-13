@@ -13,7 +13,14 @@ pub struct SecurityReport {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "lowercase")]
-pub enum SecuritySeverity { None, Info, Low, Medium, High, Critical }
+pub enum SecuritySeverity {
+    None,
+    Info,
+    Low,
+    Medium,
+    High,
+    Critical,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecurityFinding {
@@ -29,15 +36,21 @@ pub struct SecurityFinding {
 pub struct SecurityReview;
 
 impl SecurityReview {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 #[async_trait]
 impl Analyzer for SecurityReview {
     type Output = SecurityReport;
 
-    fn name(&self) -> &'static str { "aegis-security" }
-    fn prompt_name(&self) -> &'static str { "redteam-security" }
+    fn name(&self) -> &'static str {
+        "aegis-security"
+    }
+    fn prompt_name(&self) -> &'static str {
+        "redteam-security"
+    }
 
     fn build_user_message(&self, diff: &str, _context: Option<&str>) -> String {
         format!(

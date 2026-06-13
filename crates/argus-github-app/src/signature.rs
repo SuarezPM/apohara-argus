@@ -38,7 +38,9 @@ pub const SIGNATURE_PREFIX: &str = "sha256=";
 /// secret leaks.
 pub fn verify(secret: &[u8], header: &str, body: &[u8]) -> Result<(), SignatureError> {
     // Strip the `sha256=` prefix.
-    let hex = header.strip_prefix(SIGNATURE_PREFIX).ok_or(SignatureError::Invalid)?;
+    let hex = header
+        .strip_prefix(SIGNATURE_PREFIX)
+        .ok_or(SignatureError::Invalid)?;
 
     // GitHub's hex digest is always 64 chars (32 bytes).
     if hex.len() != 64 {
@@ -52,8 +54,7 @@ pub fn verify(secret: &[u8], header: &str, body: &[u8]) -> Result<(), SignatureE
     }
 
     // Compute the expected signature.
-    let mut mac = HmacSha256::new_from_slice(secret)
-        .map_err(|_| SignatureError::InvalidKey)?;
+    let mut mac = HmacSha256::new_from_slice(secret).map_err(|_| SignatureError::InvalidKey)?;
     mac.update(body);
     let expected = mac.finalize().into_bytes();
 
@@ -112,32 +113,50 @@ mod tests {
     fn rejects_missing_prefix() {
         let header = sign(SECRET, BODY);
         let no_prefix = header.trim_start_matches("sha256=");
-        assert!(matches!(verify(SECRET, no_prefix, BODY), Err(SignatureError::Invalid)));
+        assert!(matches!(
+            verify(SECRET, no_prefix, BODY),
+            Err(SignatureError::Invalid)
+        ));
     }
 
     #[test]
     fn rejects_wrong_secret() {
         let header = sign(SECRET, BODY);
-        assert!(matches!(verify(b"other-secret", &header, BODY), Err(SignatureError::Invalid)));
+        assert!(matches!(
+            verify(b"other-secret", &header, BODY),
+            Err(SignatureError::Invalid)
+        ));
     }
 
     #[test]
     fn rejects_tampered_body() {
         let header = sign(SECRET, BODY);
         let tampered = br#"{ "action": "tampered", "number": 42 }"#;
-        assert!(matches!(verify(SECRET, &header, tampered), Err(SignatureError::Invalid)));
+        assert!(matches!(
+            verify(SECRET, &header, tampered),
+            Err(SignatureError::Invalid)
+        ));
     }
 
     #[test]
     fn rejects_truncated_signature() {
         let header = format!("sha256{}", "a"); // 5 hex chars only
-        assert!(matches!(verify(SECRET, &header, BODY), Err(SignatureError::Invalid)));
+        assert!(matches!(
+            verify(SECRET, &header, BODY),
+            Err(SignatureError::Invalid)
+        ));
     }
 
     #[test]
     fn rejects_empty_signature() {
-        assert!(matches!(verify(SECRET, "", BODY), Err(SignatureError::Invalid)));
-        assert!(matches!(verify(SECRET, "sha256=", BODY), Err(SignatureError::Invalid)));
+        assert!(matches!(
+            verify(SECRET, "", BODY),
+            Err(SignatureError::Invalid)
+        ));
+        assert!(matches!(
+            verify(SECRET, "sha256=", BODY),
+            Err(SignatureError::Invalid)
+        ));
     }
 
     #[test]

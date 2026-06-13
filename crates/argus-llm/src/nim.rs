@@ -38,10 +38,22 @@ pub const NIM_DEFAULT_MODEL: &str = "meta/llama-3.1-70b-instruct";
 /// Available NIM models (free tier as of 2026).
 /// See: https://build.nvidia.com/explore/discover
 pub const NIM_AVAILABLE_MODELS: &[(&str, &str)] = &[
-    ("meta/llama-3.1-70b-instruct", "Llama 3.1 70B — strong coding + reasoning"),
-    ("meta/llama-3.1-405b-instruct", "Llama 3.1 405B — frontier quality"),
-    ("nvidia/nemotron-4-340b-instruct", "Nemotron 4 340B — strong reasoning"),
-    ("mistralai/mixtral-8x22b-instruct-v0.1", "Mixtral 8x22B — fast"),
+    (
+        "meta/llama-3.1-70b-instruct",
+        "Llama 3.1 70B — strong coding + reasoning",
+    ),
+    (
+        "meta/llama-3.1-405b-instruct",
+        "Llama 3.1 405B — frontier quality",
+    ),
+    (
+        "nvidia/nemotron-4-340b-instruct",
+        "Nemotron 4 340B — strong reasoning",
+    ),
+    (
+        "mistralai/mixtral-8x22b-instruct-v0.1",
+        "Mixtral 8x22B — fast",
+    ),
     ("qwen/qwen2.5-72b-instruct", "Qwen 2.5 72B — multilingual"),
 ];
 
@@ -205,10 +217,7 @@ impl LlmClient for NimClient {
         let dummy_key = SigningKey::from_bytes(&[0u8; 32]);
         let key = self.signing_key.as_ref().unwrap_or(&dummy_key);
 
-        let prev = *self
-            .prev_hash
-            .lock()
-            .expect("prev_hash mutex poisoned");
+        let prev = *self.prev_hash.lock().expect("prev_hash mutex poisoned");
 
         let event = emit_audit_event(
             &model,
@@ -228,10 +237,7 @@ impl LlmClient for NimClient {
 
         // Advance the per-client chain so the next event links here.
         let new_prev = next_prev_hash(prev, &event);
-        *self
-            .prev_hash
-            .lock()
-            .expect("prev_hash mutex poisoned") = new_prev;
+        *self.prev_hash.lock().expect("prev_hash mutex poisoned") = new_prev;
 
         Ok(response)
     }

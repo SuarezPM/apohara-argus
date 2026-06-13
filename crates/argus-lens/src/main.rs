@@ -12,7 +12,11 @@ use std::process::ExitCode;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser, Debug)]
-#[command(name = "argus-lens", about = "ARGUS Aegis Lens — weekly org digest", version)]
+#[command(
+    name = "argus-lens",
+    about = "ARGUS Aegis Lens — weekly org digest",
+    version
+)]
 struct Cli {
     #[arg(long)]
     org: String,
@@ -37,7 +41,9 @@ struct Cli {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> ExitCode {
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
         .init();
     let cli = Cli::parse();
 
@@ -48,15 +54,21 @@ async fn main() -> ExitCode {
 
     // Build PR summaries — either from mock data or (TODO) from the ledger.
     let prs: Vec<PRBriefSummary> = if !cli.mock_prs.is_empty() {
-        cli.mock_prs.iter().enumerate().map(|(i, pr_ref)| {
-            PRBriefSummary {
+        cli.mock_prs
+            .iter()
+            .enumerate()
+            .map(|(i, pr_ref)| PRBriefSummary {
                 pr_ref: pr_ref.clone(),
                 author: format!("dev{}", i + 1),
                 risk_score: 0.2 + (i as f32 * 0.15) % 0.8,
-                top_finding: if i == 0 { "hardcoded secret in config.py".into() } else { "minor AI slop signals".into() },
+                top_finding: if i == 0 {
+                    "hardcoded secret in config.py".into()
+                } else {
+                    "minor AI slop signals".into()
+                },
                 critical_findings: if i == 0 { 1 } else { 0 },
-            }
-        }).collect()
+            })
+            .collect()
     } else {
         eprintln!("No repos or mock-prs provided. Use --mock-prs to seed demo data.");
         return ExitCode::from(2);

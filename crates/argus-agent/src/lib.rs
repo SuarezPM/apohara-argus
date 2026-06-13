@@ -80,7 +80,10 @@ impl AgentSpec {
     pub fn canonical(role: AgentRole) -> Self {
         match role {
             AgentRole::AegisSlop => Self {
-                spiffe_id: format!("spiffe://apohara.dev/argus/aegis-slop/instance/{}", Uuid::new_v4()),
+                spiffe_id: format!(
+                    "spiffe://apohara.dev/argus/aegis-slop/instance/{}",
+                    Uuid::new_v4()
+                ),
                 role,
                 prompt_name: "slop-detector".into(),
                 capabilities: vec![
@@ -97,7 +100,10 @@ impl AgentSpec {
                 default_max_tokens: 1024,
             },
             AgentRole::AegisSecurity => Self {
-                spiffe_id: format!("spiffe://apohara.dev/argus/aegis-security/instance/{}", Uuid::new_v4()),
+                spiffe_id: format!(
+                    "spiffe://apohara.dev/argus/aegis-security/instance/{}",
+                    Uuid::new_v4()
+                ),
                 role,
                 prompt_name: "redteam-security".into(),
                 capabilities: vec![
@@ -118,7 +124,10 @@ impl AgentSpec {
                 default_max_tokens: 1536,
             },
             AgentRole::AegisArch => Self {
-                spiffe_id: format!("spiffe://apohara.dev/argus/aegis-arch/instance/{}", Uuid::new_v4()),
+                spiffe_id: format!(
+                    "spiffe://apohara.dev/argus/aegis-arch/instance/{}",
+                    Uuid::new_v4()
+                ),
                 role,
                 prompt_name: "architecture-fit".into(),
                 capabilities: vec![
@@ -137,7 +146,10 @@ impl AgentSpec {
                 default_max_tokens: 1280,
             },
             AgentRole::AegisVerdict => Self {
-                spiffe_id: format!("spiffe://apohara.dev/argus/aegis-verdict/instance/{}", Uuid::new_v4()),
+                spiffe_id: format!(
+                    "spiffe://apohara.dev/argus/aegis-verdict/instance/{}",
+                    Uuid::new_v4()
+                ),
                 role,
                 prompt_name: "verdict-synthesizer".into(),
                 capabilities: vec![
@@ -155,7 +167,11 @@ impl AgentSpec {
                 default_max_tokens: 1024,
             },
             AgentRole::AegisScope | AgentRole::AegisLens => Self {
-                spiffe_id: format!("spiffe://apohara.dev/argus/aegis-{}/instance/{}", role.as_str(), Uuid::new_v4()),
+                spiffe_id: format!(
+                    "spiffe://apohara.dev/argus/aegis-{}/instance/{}",
+                    role.as_str(),
+                    Uuid::new_v4()
+                ),
                 role,
                 prompt_name: String::new(),
                 capabilities: vec!["orchestrate".into()],
@@ -163,13 +179,15 @@ impl AgentSpec {
                 constraints: vec![Constraint::NoMergeDecisions],
                 default_temperature: 0.0,
                 default_max_tokens: 0,
-            }
+            },
         }
     }
 
     /// Returns true if the agent operates under the Cordon Principle.
     pub fn is_cordon_enforced(&self) -> bool {
-        self.constraints.iter().any(|c| matches!(c, Constraint::NoRawCode))
+        self.constraints
+            .iter()
+            .any(|c| matches!(c, Constraint::NoRawCode))
     }
 
     /// Returns true if this agent requires diff-only context.
@@ -221,7 +239,9 @@ pub struct DecisionLog {
 }
 
 impl DecisionLog {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Append a new entry. The `prev_hash` is taken from the current tail.
     pub fn append(
@@ -232,7 +252,9 @@ impl DecisionLog {
         output_summary: impl Into<String>,
         reasoning: impl Into<String>,
     ) -> &DecisionLogEntry {
-        let prev_hash = self.entries.last()
+        let prev_hash = self
+            .entries
+            .last()
             .map(|e| e.entry_hash.clone())
             .unwrap_or_default();
         let input_s: String = input_summary.into();
@@ -259,9 +281,15 @@ impl DecisionLog {
         self.entries.last().unwrap()
     }
 
-    pub fn entries(&self) -> &[DecisionLogEntry] { &self.entries }
-    pub fn len(&self) -> usize { self.entries.len() }
-    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+    pub fn entries(&self) -> &[DecisionLogEntry] {
+        &self.entries
+    }
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
 }
 
 // ============================================================================
@@ -270,7 +298,9 @@ impl DecisionLog {
 
 #[derive(Error, Debug)]
 pub enum CordonError {
-    #[error("Cordon Principle violation: a synthesis agent would have access to raw code. Blocked.")]
+    #[error(
+        "Cordon Principle violation: a synthesis agent would have access to raw code. Blocked."
+    )]
     RawCodeLeak,
     #[error("Agent spec is invalid: {0}")]
     InvalidSpec(String),
@@ -283,10 +313,15 @@ pub enum CordonError {
 pub struct CordonEnforcer;
 
 impl CordonEnforcer {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 
     /// Verify that the context about to be sent to a synthesizer agent is safe.
-    pub fn verify_safe_to_synthesize(&self, context_type: &ContextRequirement) -> Result<(), CordonError> {
+    pub fn verify_safe_to_synthesize(
+        &self,
+        context_type: &ContextRequirement,
+    ) -> Result<(), CordonError> {
         match context_type {
             ContextRequirement::OtherAgentsOutputs => Ok(()),
             ContextRequirement::DiffOnly | ContextRequirement::DiffPlusRepoSample => {
@@ -303,13 +338,18 @@ impl CordonEnforcer {
     fn scan_for_raw_code(value: &serde_json::Value) -> Result<(), CordonError> {
         match value {
             serde_json::Value::String(s) => {
-                if s.lines().any(|l| l.starts_with("+ ") || l.starts_with("- ")) && s.contains('\n') {
+                if s.lines()
+                    .any(|l| l.starts_with("+ ") || l.starts_with("- "))
+                    && s.contains('\n')
+                {
                     return Err(CordonError::RawCodeLeak);
                 }
                 Ok(())
             }
             serde_json::Value::Array(arr) => {
-                for v in arr { Self::scan_for_raw_code(v)?; }
+                for v in arr {
+                    Self::scan_for_raw_code(v)?;
+                }
                 Ok(())
             }
             serde_json::Value::Object(map) => {
@@ -405,7 +445,8 @@ impl Orchestrator {
         task_summary: impl Into<String>,
         reasoning: impl Into<String>,
     ) -> &DecisionLogEntry {
-        let spiffe_id = self.find_specialist(specialist_role)
+        let spiffe_id = self
+            .find_specialist(specialist_role)
             .map(|s| s.spiffe_id.clone())
             .unwrap_or_else(|| "unknown".into());
         self.log.append(
@@ -419,7 +460,8 @@ impl Orchestrator {
 
     /// Record that a Cordon violation was blocked.
     pub fn record_cordon_block(&mut self, attempted_role: AgentRole) -> &DecisionLogEntry {
-        let spiffe_id = self.find_specialist(attempted_role)
+        let spiffe_id = self
+            .find_specialist(attempted_role)
             .map(|s| s.spiffe_id.clone())
             .unwrap_or_else(|| "unknown".into());
         self.log.append(
@@ -439,7 +481,7 @@ impl Orchestrator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use argus_core::{Verdict, VerdictStatus, RiskScore};
+    use argus_core::{RiskScore, Verdict, VerdictStatus};
 
     #[test]
     fn slop_spec_has_cordon_compatible_constraints() {
@@ -452,9 +494,15 @@ mod tests {
     #[test]
     fn verdict_spec_is_cordon_enforced() {
         let s = AgentSpec::canonical(AgentRole::AegisVerdict);
-        assert!(s.is_cordon_enforced(), "verdict synthesizer must never see raw code");
+        assert!(
+            s.is_cordon_enforced(),
+            "verdict synthesizer must never see raw code"
+        );
         assert!(!s.diff_only());
-        assert!(matches!(s.context_required, ContextRequirement::OtherAgentsOutputs));
+        assert!(matches!(
+            s.context_required,
+            ContextRequirement::OtherAgentsOutputs
+        ));
     }
 
     #[test]
@@ -481,8 +529,12 @@ mod tests {
     #[test]
     fn cordon_blocks_diff_context() {
         let e = CordonEnforcer::new();
-        assert!(e.verify_safe_to_synthesize(&ContextRequirement::DiffOnly).is_err());
-        assert!(e.verify_safe_to_synthesize(&ContextRequirement::OtherAgentsOutputs).is_ok());
+        assert!(e
+            .verify_safe_to_synthesize(&ContextRequirement::DiffOnly)
+            .is_err());
+        assert!(e
+            .verify_safe_to_synthesize(&ContextRequirement::OtherAgentsOutputs)
+            .is_ok());
     }
 
     #[test]
@@ -514,11 +566,23 @@ mod tests {
     fn decision_log_chains_correctly() {
         let mut log = DecisionLog::new();
         let prev_hash_after_first = {
-            let e1 = log.append("aegis-1", DecisionType::TaskRouted, "task A", "routed", "reason A");
+            let e1 = log.append(
+                "aegis-1",
+                DecisionType::TaskRouted,
+                "task A",
+                "routed",
+                "reason A",
+            );
             assert_eq!(e1.prev_hash, "");
             e1.entry_hash.clone()
         };
-        let e2 = log.append("aegis-2", DecisionType::SpecialistOutput, "task B", "output", "reason B");
+        let e2 = log.append(
+            "aegis-2",
+            DecisionType::SpecialistOutput,
+            "task B",
+            "output",
+            "reason B",
+        );
         assert_eq!(e2.prev_hash, prev_hash_after_first);
         assert_ne!(prev_hash_after_first, e2.entry_hash);
     }
@@ -527,9 +591,16 @@ mod tests {
     fn orchestrator_records_routing_in_log() {
         let mut orch = Orchestrator::canonical();
         assert_eq!(orch.log.len(), 0);
-        orch.record_routing(AgentRole::AegisSlop, "review PR #42", "first step in PR review");
+        orch.record_routing(
+            AgentRole::AegisSlop,
+            "review PR #42",
+            "first step in PR review",
+        );
         assert_eq!(orch.log.len(), 1);
-        assert_eq!(orch.log.entries()[0].decision_type, DecisionType::TaskRouted);
+        assert_eq!(
+            orch.log.entries()[0].decision_type,
+            DecisionType::TaskRouted
+        );
     }
 
     #[test]

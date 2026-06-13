@@ -28,7 +28,9 @@ pub struct InMemoryAuditStore {
 impl InMemoryAuditStore {
     /// Empty store. Cheap; allocate the inner vec on first append.
     pub fn new() -> Self {
-        Self { events: Arc::new(RwLock::new(Vec::new())) }
+        Self {
+            events: Arc::new(RwLock::new(Vec::new())),
+        }
     }
 
     /// Append a single event.
@@ -38,11 +40,7 @@ impl InMemoryAuditStore {
 
     /// Return all events whose `timestamp` is in `[from, to]`
     /// (inclusive on both ends), in arrival order.
-    pub async fn query_range(
-        &self,
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
-    ) -> Vec<AuditEvent> {
+    pub async fn query_range(&self, from: DateTime<Utc>, to: DateTime<Utc>) -> Vec<AuditEvent> {
         self.events
             .read()
             .await
@@ -71,8 +69,7 @@ impl InMemoryAuditStore {
         for e in events {
             let mut e_no_sig = e.clone();
             e_no_sig.signature = Signature::from_bytes(&[0u8; 64]);
-            let bytes = serde_json::to_vec(&e_no_sig)
-                .expect("AuditEvent must serialize to JSON");
+            let bytes = serde_json::to_vec(&e_no_sig).expect("AuditEvent must serialize to JSON");
             hasher.update(&bytes);
         }
         let b3_hash = if events.is_empty() {
@@ -183,7 +180,9 @@ mod tests {
     #[tokio::test]
     async fn from_after_to_returns_no_events() {
         let store = InMemoryAuditStore::new();
-        store.append(sample_event(ts(2026, 6, 12, 10), "m", &fp(1))).await;
+        store
+            .append(sample_event(ts(2026, 6, 12, 10), "m", &fp(1)))
+            .await;
         let range = store
             .query_range(ts(2026, 12, 31, 0), ts(2026, 1, 1, 0))
             .await;

@@ -24,15 +24,21 @@ pub struct SlopExample {
 pub struct SlopDetector;
 
 impl SlopDetector {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 #[async_trait]
 impl Analyzer for SlopDetector {
     type Output = SlopReport;
 
-    fn name(&self) -> &'static str { "aegis-slop" }
-    fn prompt_name(&self) -> &'static str { "slop-detector" }
+    fn name(&self) -> &'static str {
+        "aegis-slop"
+    }
+    fn prompt_name(&self) -> &'static str {
+        "slop-detector"
+    }
 
     fn build_user_message(&self, diff: &str, _context: Option<&str>) -> String {
         format!(

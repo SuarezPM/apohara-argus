@@ -23,7 +23,7 @@
 //!
 //! [Refs: argus-silver-roadmap/P.2]
 
-use axum::{Json, http::StatusCode, response::IntoResponse};
+use axum::{http::StatusCode, response::IntoResponse, Json};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -77,8 +77,8 @@ impl SetupResponse {
         // every request so the JSON is always valid (a typo
         // in the source would fail to compile through
         // `serde_json::from_str` in tests).
-        let manifest: Value = serde_json::from_str(MANIFEST)
-            .expect("MANIFEST is valid JSON (enforced by tests)");
+        let manifest: Value =
+            serde_json::from_str(MANIFEST).expect("MANIFEST is valid JSON (enforced by tests)");
         let install_url = format!(
             "https://github.com/settings/apps/new?manifest={}",
             urlencoding(&MANIFEST)
@@ -181,7 +181,9 @@ mod tests {
     #[test]
     fn manifest_has_minimal_permissions() {
         let v: Value = serde_json::from_str(MANIFEST).unwrap();
-        let perms = v["default_permissions"].as_object().expect("permissions object");
+        let perms = v["default_permissions"]
+            .as_object()
+            .expect("permissions object");
         // We deliberately do NOT request `contents: write` or
         // any write scope beyond `issues`.
         assert!(perms.contains_key("pull_requests"));
@@ -202,9 +204,9 @@ mod tests {
     #[test]
     fn install_url_includes_manifest_query() {
         let resp = SetupResponse::current();
-        assert!(resp.install_url.starts_with(
-            "https://github.com/settings/apps/new?manifest="
-        ));
+        assert!(resp
+            .install_url
+            .starts_with("https://github.com/settings/apps/new?manifest="));
         // The encoded manifest should be non-trivial in length.
         assert!(resp.install_url.len() > 200);
     }

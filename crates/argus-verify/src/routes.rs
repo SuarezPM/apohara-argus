@@ -198,9 +198,7 @@ pub fn build_agent_card(base_url: &str) -> AgentCard {
 /// `GET /.well-known/agent-card.json` — A2A discovery. The URL
 /// advertised in the card is templated from the request's `Host`
 /// header so the orchestrator can reach the agent back.
-pub async fn agent_card_handler(
-    headers: axum::http::HeaderMap,
-) -> impl IntoResponse {
+pub async fn agent_card_handler(headers: axum::http::HeaderMap) -> impl IntoResponse {
     let host = headers
         .get("host")
         .and_then(|v| v.to_str().ok())
@@ -219,9 +217,7 @@ pub async fn agent_card_handler(
 /// name (or "default" if unspecified) so orchestrators can confirm
 /// connectivity. The real work happens via `/analyze` on the PR
 /// review pipeline.
-pub async fn a2a_message_handler(
-    Json(msg): Json<A2AMessage>,
-) -> impl IntoResponse {
+pub async fn a2a_message_handler(Json(msg): Json<A2AMessage>) -> impl IntoResponse {
     let skill = msg.target_skill.as_deref().unwrap_or("default");
     let text_excerpt: String = msg
         .parts
@@ -287,14 +283,20 @@ mod tests {
     #[test]
     fn agent_card_url_strips_trailing_slash() {
         let card = build_agent_card("http://localhost:8080/");
-        assert_eq!(card.url, "http://localhost:8080/.well-known/agent-card.json");
+        assert_eq!(
+            card.url,
+            "http://localhost:8080/.well-known/agent-card.json"
+        );
     }
 
     #[test]
     fn agent_card_serializes_to_well_known_url() {
         let card = build_agent_card("https://argus.example.com");
         let json = serde_json::to_value(&card).unwrap();
-        assert_eq!(json["url"], "https://argus.example.com/.well-known/agent-card.json");
+        assert_eq!(
+            json["url"],
+            "https://argus.example.com/.well-known/agent-card.json"
+        );
         assert!(json["authentication"]["schemes"].is_array());
     }
 

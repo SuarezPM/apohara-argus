@@ -25,15 +25,21 @@ pub struct ArchConcern {
 pub struct ArchitectureFit;
 
 impl ArchitectureFit {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 #[async_trait]
 impl Analyzer for ArchitectureFit {
     type Output = ArchReport;
 
-    fn name(&self) -> &'static str { "aegis-arch" }
-    fn prompt_name(&self) -> &'static str { "architecture-fit" }
+    fn name(&self) -> &'static str {
+        "aegis-arch"
+    }
+    fn prompt_name(&self) -> &'static str {
+        "architecture-fit"
+    }
 
     fn build_user_message(&self, diff: &str, context: Option<&str>) -> String {
         let context = context.unwrap_or("");

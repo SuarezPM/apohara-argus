@@ -11,11 +11,11 @@
 //! Why opt-in (not opt-out): on Fly.io free tier every cycle counts.
 //! When a user has no collector, the JSON spans just add to log volume.
 
+use opentelemetry::trace::Tracer;
 use opentelemetry::trace::TracerProvider as _;
+use opentelemetry::KeyValue;
 use opentelemetry_sdk::trace::{Config as SdkTraceConfig, TracerProvider};
 use opentelemetry_sdk::Resource;
-use opentelemetry::KeyValue;
-use opentelemetry::trace::Tracer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
@@ -54,14 +54,11 @@ pub fn init(service_label: &str) -> Option<TelemetryGuard> {
     let exporter = opentelemetry_stdout::SpanExporter::default();
     let provider = TracerProvider::builder()
         .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
-        .with_config(
-            SdkTraceConfig::default()
-                .with_resource(Resource::new(vec![
-                    KeyValue::new("service.name", SERVICE_NAME),
-                    KeyValue::new("service.version", SERVICE_VERSION),
-                    KeyValue::new("service.component", service_label.to_string()),
-                ])),
-        )
+        .with_config(SdkTraceConfig::default().with_resource(Resource::new(vec![
+            KeyValue::new("service.name", SERVICE_NAME),
+            KeyValue::new("service.version", SERVICE_VERSION),
+            KeyValue::new("service.component", service_label.to_string()),
+        ])))
         .build();
     let tracer = provider.tracer(service_label.to_string());
 
@@ -71,8 +68,7 @@ pub fn init(service_label: &str) -> Option<TelemetryGuard> {
     // installed one (e.g., the binary's `tracing_subscriber::fmt()`
     // call in `main()`), we leave it alone and just return None so
     // the caller knows spans won't be exported.
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info"));
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
     let fmt_layer = tracing_subscriber::fmt::layer()
         .with_target(true)
         .with_thread_ids(false)

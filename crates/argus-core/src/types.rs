@@ -38,10 +38,18 @@ pub enum FindingSeverity {
 pub struct RiskScore(pub f32);
 
 impl RiskScore {
-    pub fn new(v: f32) -> Self { Self(v.clamp(0.0, 1.0)) }
-    pub fn as_f32(self) -> f32 { self.0 }
-    pub fn is_high(self) -> bool { self.0 >= 0.7 }
-    pub fn is_critical(self) -> bool { self.0 >= 0.85 }
+    pub fn new(v: f32) -> Self {
+        Self(v.clamp(0.0, 1.0))
+    }
+    pub fn as_f32(self) -> f32 {
+        self.0
+    }
+    pub fn is_high(self) -> bool {
+        self.0 >= 0.7
+    }
+    pub fn is_critical(self) -> bool {
+        self.0 >= 0.85
+    }
 }
 
 /// The final verdict emitted by the verdict-synthesizer.
@@ -212,7 +220,8 @@ pub mod hex_bytes {
     pub fn deserialize<'de, D: Deserializer<'de>>(de: D) -> Result<[u8; 32], D::Error> {
         let s = String::deserialize(de)?;
         let v = hex::decode(&s).map_err(serde::de::Error::custom)?;
-        v.try_into().map_err(|_| serde::de::Error::custom("expected 32-byte hex string"))
+        v.try_into()
+            .map_err(|_| serde::de::Error::custom("expected 32-byte hex string"))
     }
 }
 
@@ -446,12 +455,14 @@ impl FixPlan {
         let mut steps: Vec<FixStep> = findings.iter().map(finding_to_step).collect();
         // Sort: highest severity first. FindingSeverity derives Ord
         // (Info=lowest, Critical=highest) so reverse works.
-        steps.sort_by(|a, b| b.severity.cmp(&a.severity));
+        steps.sort_by_key(|b| std::cmp::Reverse(b.severity));
 
         let mut by_severity: std::collections::BTreeMap<String, u32> =
             std::collections::BTreeMap::new();
         for s in &steps {
-            *by_severity.entry(severity_label(s.severity).to_string()).or_insert(0) += 1;
+            *by_severity
+                .entry(severity_label(s.severity).to_string())
+                .or_insert(0) += 1;
         }
 
         Self {
@@ -478,7 +489,9 @@ fn severity_label(s: FindingSeverity) -> &'static str {
 /// downstream agent decide.
 fn finding_to_step(f: &PRFinding) -> FixStep {
     let kind = match f.category.as_str() {
-        "unhandled_credential" | "security" | "injection" | "unsafe_panic" => FixStepKind::SecurityPatch,
+        "unhandled_credential" | "security" | "injection" | "unsafe_panic" => {
+            FixStepKind::SecurityPatch
+        }
         "missing_test" | "untested_branch" | "test_coverage" => FixStepKind::AddTest,
         "dead_code" | "swallowed_err" | "unwrap" | "expect" => FixStepKind::RemoveCode,
         "oversized_fn" | "complexity" | "refactor" => FixStepKind::ModifyFunction,
@@ -506,7 +519,12 @@ mod fix_plan_tests {
     use super::*;
     use chrono::Utc;
 
-    fn finding(severity: FindingSeverity, category: &str, file: &str, line: Option<u32>) -> PRFinding {
+    fn finding(
+        severity: FindingSeverity,
+        category: &str,
+        file: &str,
+        line: Option<u32>,
+    ) -> PRFinding {
         PRFinding {
             id: Uuid::new_v4(),
             agent: AgentRole::AegisSlop,
@@ -533,7 +551,12 @@ mod fix_plan_tests {
     fn from_findings_sorts_critical_first() {
         let findings = vec![
             finding(FindingSeverity::Info, "doc", "src/lib.rs", Some(1)),
-            finding(FindingSeverity::Critical, "security", "src/api.rs", Some(42)),
+            finding(
+                FindingSeverity::Critical,
+                "security",
+                "src/api.rs",
+                Some(42),
+            ),
             finding(FindingSeverity::Medium, "test", "src/foo.rs", Some(10)),
         ];
         let plan = FixPlan::from_findings(&findings);
@@ -558,7 +581,12 @@ mod fix_plan_tests {
 
     #[test]
     fn json_roundtrip_preserves_all_fields() {
-        let findings = vec![finding(FindingSeverity::Critical, "security", "src/auth.rs", Some(99))];
+        let findings = vec![finding(
+            FindingSeverity::Critical,
+            "security",
+            "src/auth.rs",
+            Some(99),
+        )];
         let plan = FixPlan::from_findings(&findings);
         let json = serde_json::to_string(&plan).unwrap();
         let back: FixPlan = serde_json::from_str(&json).unwrap();

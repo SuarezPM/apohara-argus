@@ -143,7 +143,11 @@ mod tests {
         for role in ModelRole::ALL {
             std::env::remove_var(role.env_var());
             let m = ModelRegistry::new().select_for_role(role);
-            assert!(!m.is_empty(), "role {:?} should have a non-empty model", role);
+            assert!(
+                !m.is_empty(),
+                "role {:?} should have a non-empty model",
+                role
+            );
         }
     }
 

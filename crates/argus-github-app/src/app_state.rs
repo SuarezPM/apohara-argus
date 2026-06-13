@@ -72,12 +72,12 @@ impl AppConfig {
                 "ARGUS_APP_WEBHOOK_SECRET must not be empty".into(),
             ));
         }
-        let label_pass = std::env::var("ARGUS_APP_LABEL_PASS")
-            .unwrap_or_else(|_| "argus/approved".to_string());
+        let label_pass =
+            std::env::var("ARGUS_APP_LABEL_PASS").unwrap_or_else(|_| "argus/approved".to_string());
         let label_warn = std::env::var("ARGUS_APP_LABEL_WARN")
             .unwrap_or_else(|_| "argus/needs-review".to_string());
-        let label_fail = std::env::var("ARGUS_APP_LABEL_FAIL")
-            .unwrap_or_else(|_| "argus/halted".to_string());
+        let label_fail =
+            std::env::var("ARGUS_APP_LABEL_FAIL").unwrap_or_else(|_| "argus/halted".to_string());
         let allowed_repos = std::env::var("ARGUS_APP_ALLOWED_REPOS")
             .unwrap_or_default()
             .split(',')
@@ -181,7 +181,9 @@ impl VersionResponse {
         Self {
             name: "argus-github-app",
             version: env!("CARGO_PKG_VERSION"),
-            git_sha: std::env::var("ARGUS_GIT_SHA").ok().filter(|s| !s.is_empty()),
+            git_sha: std::env::var("ARGUS_GIT_SHA")
+                .ok()
+                .filter(|s| !s.is_empty()),
         }
     }
 }

@@ -195,11 +195,7 @@ async fn handle_pr_event(
     let signals = run_deterministic_rules(&diff);
     let slop = summarize_signals(&signals);
 
-    let (label_slug, comment_body) = compose_verdict(
-        &config,
-        &payload,
-        &slop,
-    );
+    let (label_slug, comment_body) = compose_verdict(&config, &payload, &slop);
 
     // Post the comment.
     if let Err(e) = gh.post_comment(owner, repo, number, &comment_body).await {
@@ -260,14 +256,15 @@ fn summarize_signals(signals: &[SlopSignal]) -> SlopSummary {
             Severity::Warning => warning_count += 1,
             Severity::Info => info_count += 1,
         }
-        bullets.push(format!("- `[{}]` line {}: {}", s.rule_id, s.line, s.message));
+        bullets.push(format!(
+            "- `[{}]` line {}: {}",
+            s.rule_id, s.line, s.message
+        ));
     }
     // Weighted score: 0.4 per Error, 0.15 per Warning, 0.05 per
     // Info, clamped to [0, 1]. Matches the rough shape of
     // `argus-slop::slop_detector::SlopDetector::slop_score`.
-    let raw = error_count as f32 * 0.4
-        + warning_count as f32 * 0.15
-        + info_count as f32 * 0.05;
+    let raw = error_count as f32 * 0.4 + warning_count as f32 * 0.15 + info_count as f32 * 0.05;
     let score = raw.clamp(0.0, 1.0);
     let body = if signals.is_empty() {
         "Deterministic layer found no mechanical slop signals.".to_string()
@@ -339,13 +336,7 @@ fn compose_verdict(
     (slug, body)
 }
 
-fn emit_audit_receipt(
-    owner: &str,
-    repo: &str,
-    number: u32,
-    diff: &str,
-    slop: &SlopSummary,
-) {
+fn emit_audit_receipt(owner: &str, repo: &str, number: u32, diff: &str, slop: &SlopSummary) {
     let diff_fingerprint = blake3::hash(diff.as_bytes());
     let summary_fingerprint = blake3::hash(slop.body.as_bytes());
     info!(
@@ -370,8 +361,14 @@ mod tests {
             number: 42,
             pull_request: crate::cordon::PullRequestFields {
                 number: 42,
-                head: crate::cordon::GitRef { sha: "abc".into(), r#ref: Some("feature".into()) },
-                base: crate::cordon::GitRef { sha: "def".into(), r#ref: Some("main".into()) },
+                head: crate::cordon::GitRef {
+                    sha: "abc".into(),
+                    r#ref: Some("feature".into()),
+                },
+                base: crate::cordon::GitRef {
+                    sha: "def".into(),
+                    r#ref: Some("main".into()),
+                },
                 html_url: "https://github.com/octocat/hello-world/pull/42".into(),
             },
             repository: crate::cordon::RepositoryFields {

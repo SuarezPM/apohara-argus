@@ -7,20 +7,19 @@
 //! - The Argus Prompt Library loader (the 4 .md files)
 //! - Configuration (env vars, defaults)
 
+pub mod config;
 pub mod errors;
 pub mod prompts;
 pub mod types;
-pub mod config;
 
-pub use errors::{ArgusError, Result};
-pub use types::{
-    PRFinding, FindingSeverity, RiskScore, Verdict, VerdictStatus,
-    PRReview, AgentAction, AgentRole, LedgerEntry, LedgerEntryKind,
-    OrgSummary, WeeklyBriefing, OffenderSummary, TeamSummary,
-    AuditEvent, DecisionArtifact, ToolCallRecord, Manifest, DataClass,
-    FixPlan, FixStep, FixStepKind,
-};
-pub use prompts::{Prompt, PromptLibrary, PromptMetadata};
 pub use config::Config;
+pub use errors::{ArgusError, Result};
+pub use prompts::{Prompt, PromptLibrary, PromptMetadata};
+pub use types::{
+    AgentAction, AgentRole, AuditEvent, DataClass, DecisionArtifact, FindingSeverity, FixPlan,
+    FixStep, FixStepKind, LedgerEntry, LedgerEntryKind, Manifest, OffenderSummary, OrgSummary,
+    PRFinding, PRReview, RiskScore, TeamSummary, ToolCallRecord, Verdict, VerdictStatus,
+    WeeklyBriefing,
+};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

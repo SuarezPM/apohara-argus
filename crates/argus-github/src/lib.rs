@@ -82,79 +82,142 @@ impl GitHubClient {
     /// Parse a PR URL like `https://github.com/owner/repo/pull/42` into parts.
     pub fn parse_pr_url(url: &str) -> Result<(String, String, u32)> {
         let parsed = Url::parse(url).map_err(|e| GitHubError::InvalidUrl(e.to_string()))?;
-        let segments: Vec<&str> = parsed.path_segments()
+        let segments: Vec<&str> = parsed
+            .path_segments()
             .ok_or_else(|| GitHubError::InvalidUrl("no path".into()))?
             .filter(|s| !s.is_empty())
             .collect();
         if segments.len() < 4 || segments[2] != "pull" {
-            return Err(GitHubError::InvalidUrl(format!("expected /owner/repo/pull/N, got {}", url)));
+            return Err(GitHubError::InvalidUrl(format!(
+                "expected /owner/repo/pull/N, got {}",
+                url
+            )));
         }
         let owner = segments[0].to_string();
         let repo = segments[1].to_string();
-        let number: u32 = segments[3].parse().map_err(|e: std::num::ParseIntError| GitHubError::InvalidUrl(e.to_string()))?;
+        let number: u32 = segments[3]
+            .parse()
+            .map_err(|e: std::num::ParseIntError| GitHubError::InvalidUrl(e.to_string()))?;
         Ok((owner, repo, number))
     }
 
     /// Fetch a PR by URL.
     pub async fn get_pr(&self, owner: &str, repo: &str, number: u32) -> Result<PullRequest> {
-        let url = format!("{}/repos/{}/{}/pulls/{}", self.base_url, owner, repo, number);
-        let resp = self.http.get(&url).bearer_auth(&self.token).send().await
+        let url = format!(
+            "{}/repos/{}/{}/pulls/{}",
+            self.base_url, owner, repo, number
+        );
+        let resp = self
+            .http
+            .get(&url)
+            .bearer_auth(&self.token)
+            .send()
+            .await
             .map_err(|e| GitHubError::Http(e.to_string()))?;
         let status = resp.status();
         if !status.is_success() {
             let text = resp.text().await.unwrap_or_default();
-            return Err(GitHubError::Api { status: status.as_u16(), message: text });
+            return Err(GitHubError::Api {
+                status: status.as_u16(),
+                message: text,
+            });
         }
-        resp.json().await.map_err(|e| GitHubError::Parse(e.to_string()))
+        resp.json()
+            .await
+            .map_err(|e| GitHubError::Parse(e.to_string()))
     }
 
     /// Fetch the diff of a PR (unified diff format).
     pub async fn get_diff(&self, owner: &str, repo: &str, number: u32) -> Result<String> {
-        let url = format!("{}/repos/{}/{}/pulls/{}", self.base_url, owner, repo, number);
-        let resp = self.http.get(&url)
+        let url = format!(
+            "{}/repos/{}/{}/pulls/{}",
+            self.base_url, owner, repo, number
+        );
+        let resp = self
+            .http
+            .get(&url)
             .bearer_auth(&self.token)
             .header("Accept", "application/vnd.github.v3.diff")
-            .send().await
+            .send()
+            .await
             .map_err(|e| GitHubError::Http(e.to_string()))?;
         let status = resp.status();
         if !status.is_success() {
             let text = resp.text().await.unwrap_or_default();
-            return Err(GitHubError::Api { status: status.as_u16(), message: text });
+            return Err(GitHubError::Api {
+                status: status.as_u16(),
+                message: text,
+            });
         }
-        resp.text().await.map_err(|e| GitHubError::Parse(e.to_string()))
+        resp.text()
+            .await
+            .map_err(|e| GitHubError::Parse(e.to_string()))
     }
 
     /// Post a comment on a PR.
-    pub async fn post_comment(&self, owner: &str, repo: &str, number: u32, body: &str) -> Result<u64> {
-        let url = format!("{}/repos/{}/{}/issues/{}/comments", self.base_url, owner, repo, number);
-        let resp = self.http.post(&url)
+    pub async fn post_comment(
+        &self,
+        owner: &str,
+        repo: &str,
+        number: u32,
+        body: &str,
+    ) -> Result<u64> {
+        let url = format!(
+            "{}/repos/{}/{}/issues/{}/comments",
+            self.base_url, owner, repo, number
+        );
+        let resp = self
+            .http
+            .post(&url)
             .bearer_auth(&self.token)
             .header("Accept", "application/vnd.github+json")
             .json(&serde_json::json!({ "body": body }))
-            .send().await
+            .send()
+            .await
             .map_err(|e| GitHubError::Http(e.to_string()))?;
         let status = resp.status();
         if !status.is_success() {
             let text = resp.text().await.unwrap_or_default();
-            return Err(GitHubError::Api { status: status.as_u16(), message: text });
+            return Err(GitHubError::Api {
+                status: status.as_u16(),
+                message: text,
+            });
         }
-        let v: serde_json::Value = resp.json().await.map_err(|e| GitHubError::Parse(e.to_string()))?;
+        let v: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| GitHubError::Parse(e.to_string()))?;
         Ok(v["id"].as_u64().unwrap_or(0))
     }
 
     /// Set labels on a PR (replaces existing labels).
-    pub async fn set_labels(&self, owner: &str, repo: &str, number: u32, labels: &[&str]) -> Result<()> {
-        let url = format!("{}/repos/{}/{}/issues/{}/labels", self.base_url, owner, repo, number);
-        let resp = self.http.put(&url)
+    pub async fn set_labels(
+        &self,
+        owner: &str,
+        repo: &str,
+        number: u32,
+        labels: &[&str],
+    ) -> Result<()> {
+        let url = format!(
+            "{}/repos/{}/{}/issues/{}/labels",
+            self.base_url, owner, repo, number
+        );
+        let resp = self
+            .http
+            .put(&url)
             .bearer_auth(&self.token)
             .header("Accept", "application/vnd.github+json")
             .json(&serde_json::json!({ "labels": labels }))
-            .send().await
+            .send()
+            .await
             .map_err(|e| GitHubError::Http(e.to_string()))?;
         let status = resp.status();
         if !status.is_success() {
             let text = resp.text().await.unwrap_or_default();
-            return Err(GitHubError::Api { status: status.as_u16(), message: text });
+            return Err(GitHubError::Api {
+                status: status.as_u16(),
+                message: text,
+            });
         }
         Ok(())
     }
@@ -178,7 +241,10 @@ impl GitHubClient {
             "HALTED" => "🛑",
             _ => "❓",
         };
-        s.push_str(&format!("## {} ARGUS Review — `{}`\n\n", emoji, verdict_status));
+        s.push_str(&format!(
+            "## {} ARGUS Review — `{}`\n\n",
+            emoji, verdict_status
+        ));
         s.push_str(&format!("**PR:** `{}`\n", pr_ref));
         s.push_str(&format!("**Risk score:** {:.2} / 1.00\n\n", risk_score));
         s.push_str(&format!("{}\n\n", summary));
@@ -189,12 +255,16 @@ impl GitHubClient {
         s.push_str(&format!("| Security | {} |\n\n", security_summary));
         if !key_findings.is_empty() {
             s.push_str("### Key findings\n\n");
-            for f in key_findings { s.push_str(&format!("- {}\n", f)); }
+            for f in key_findings {
+                s.push_str(&format!("- {}\n", f));
+            }
             s.push('\n');
         }
         if !action_items.is_empty() {
             s.push_str("### Action items\n\n");
-            for a in action_items { s.push_str(&format!("- {}\n", a)); }
+            for a in action_items {
+                s.push_str(&format!("- {}\n", a));
+            }
             s.push('\n');
         }
         s.push_str("---\n");
@@ -210,7 +280,9 @@ mod tests {
 
     #[test]
     fn parses_pr_url() {
-        let (o, r, n) = GitHubClient::parse_pr_url("https://github.com/SuarezPM/apohara-argus/pull/42").unwrap();
+        let (o, r, n) =
+            GitHubClient::parse_pr_url("https://github.com/SuarezPM/apohara-argus/pull/42")
+                .unwrap();
         assert_eq!(o, "SuarezPM");
         assert_eq!(r, "apohara-argus");
         assert_eq!(n, 42);

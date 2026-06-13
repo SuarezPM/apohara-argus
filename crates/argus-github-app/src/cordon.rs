@@ -131,7 +131,9 @@ impl CordonEnforcer {
                 Ok(())
             }
             serde_json::Value::Array(arr) => {
-                for item in arr { Self::scan(item)?; }
+                for item in arr {
+                    Self::scan(item)?;
+                }
                 Ok(())
             }
             serde_json::Value::Object(map) => {
@@ -142,9 +144,9 @@ impl CordonEnforcer {
                     if k == "patch" || k == "diff" || k == "body" || k.ends_with("_body") {
                         // `body` may contain user-supplied URLs
                         // in PR descriptions, but it's also where
-                    // reviewers put code samples. We only
-                    // scan strings that contain a `://` substring.
-                    // The outer `scan` already gates on that.
+                        // reviewers put code samples. We only
+                        // scan strings that contain a `://` substring.
+                        // The outer `scan` already gates on that.
                         Self::scan(v)?;
                     } else {
                         Self::scan(v)?;
@@ -263,7 +265,10 @@ mod tests {
             "html_url": "https://attacker.example.com/payload",
             "user": { "html_url": "https://github.com/octocat" }
         });
-        assert!(matches!(e.check_no_ssrf(&payload), Err(CordonError::UntrustedHost(_))));
+        assert!(matches!(
+            e.check_no_ssrf(&payload),
+            Err(CordonError::UntrustedHost(_))
+        ));
     }
 
     #[test]

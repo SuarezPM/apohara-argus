@@ -165,7 +165,9 @@ mod tests {
             prev0,
             None,
             None,
-            DataClass::SourceCode, "policy-v1", &key,
+            DataClass::SourceCode,
+            "policy-v1",
+            &key,
         );
         let prev1 = next_prev_hash(prev0, &e1);
 
@@ -180,7 +182,9 @@ mod tests {
             prev1,
             None,
             None,
-            DataClass::SourceCode, "policy-v1", &key,
+            DataClass::SourceCode,
+            "policy-v1",
+            &key,
         );
         let prev2 = next_prev_hash(prev1, &e2);
 
@@ -195,7 +199,9 @@ mod tests {
             prev2,
             None,
             None,
-            DataClass::SourceCode, "policy-v1", &key,
+            DataClass::SourceCode,
+            "policy-v1",
+            &key,
         );
         let prev3 = next_prev_hash(prev2, &e3);
 
@@ -236,7 +242,9 @@ mod tests {
             [0u8; 32],
             Some(10),
             Some(5),
-            DataClass::SourceCode, "policy-v1", &key,
+            DataClass::SourceCode,
+            "policy-v1",
+            &key,
         );
 
         // Re-canonicalize with the signature zeroed, then verify.
@@ -267,7 +275,9 @@ mod tests {
             [0u8; 32],
             None,
             None,
-            DataClass::SourceCode, "policy-v1", &key,
+            DataClass::SourceCode,
+            "policy-v1",
+            &key,
         );
         let v: Value = serde_json::to_value(&event).unwrap();
         let obj = v.as_object().unwrap();
@@ -276,7 +286,10 @@ mod tests {
         assert_eq!(obj.len(), 16);
         // GDPR: the cleartext prompt (and any PII inside it) is gone.
         let s = serde_json::to_string(&event).unwrap();
-        assert!(!s.contains(secret), "cleartext prompt must not appear in JSON");
+        assert!(
+            !s.contains(secret),
+            "cleartext prompt must not appear in JSON"
+        );
         assert!(!s.contains("123-45-6789"), "PII must not leak into JSON");
     }
 

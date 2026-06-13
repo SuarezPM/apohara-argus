@@ -55,8 +55,9 @@ struct AnalyzeBody {
 }
 
 async fn index(State(state): State<AppState>) -> impl IntoResponse {
-    let briefing = std::fs::read_to_string(&state.briefings_path)
-        .unwrap_or_else(|_| "No briefing generated yet. Run `argus lens --mock-prs ...` to seed one.".into());
+    let briefing = std::fs::read_to_string(&state.briefings_path).unwrap_or_else(|_| {
+        "No briefing generated yet. Run `argus lens --mock-prs ...` to seed one.".into()
+    });
     let html = render_landing(&briefing);
     Html(html)
 }
@@ -73,14 +74,23 @@ async fn api_analyze(
         let demo_json = include_str!("../static/demo-result.json");
         let demo: serde_json::Value = serde_json::from_str(demo_json)
             .unwrap_or_else(|_| serde_json::json!({"error": "demo fixture malformed"}));
-        return Ok(Json(serde_json::from_value(demo)
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("demo shape mismatch: {e}")))?));
+        return Ok(Json(serde_json::from_value(demo).map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("demo shape mismatch: {e}"),
+            )
+        })?));
     }
     if body.nim_key.is_empty() {
         std::env::var("ARGUS_NIM_KEY")
             .ok()
             .filter(|s| !s.is_empty())
-            .ok_or_else(|| (StatusCode::UNAUTHORIZED, "BYOK: pass `nim_key` in JSON body or set ARGUS_NIM_KEY env var".to_string()))?;
+            .ok_or_else(|| {
+                (
+                    StatusCode::UNAUTHORIZED,
+                    "BYOK: pass `nim_key` in JSON body or set ARGUS_NIM_KEY env var".to_string(),
+                )
+            })?;
     } else {
         std::env::set_var("ARGUS_NIM_KEY", &body.nim_key);
     }
@@ -90,7 +100,10 @@ async fn api_analyze(
         post_comment: body.post_comment,
         set_labels: body.set_labels,
     };
-    let resp = state.worker.analyze(req).await
+    let resp = state
+        .worker
+        .analyze(req)
+        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("{}", e)))?;
     Ok(Json(resp))
 }
@@ -120,7 +133,10 @@ async fn api_health() -> impl IntoResponse {
     }))
 }
 
-async fn submit_form(State(state): State<AppState>, Form(form): Form<SubmitForm>) -> impl IntoResponse {
+async fn submit_form(
+    State(state): State<AppState>,
+    Form(form): Form<SubmitForm>,
+) -> impl IntoResponse {
     let nim_key = form.nim_key.clone();
     if !nim_key.is_empty() {
         std::env::set_var("ARGUS_NIM_KEY", &nim_key);
@@ -214,14 +230,15 @@ struct SubmitForm {
 
 fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;")
-     .replace('<', "&lt;")
-     .replace('>', "&gt;")
-     .replace('"', "&quot;")
-     .replace('\'', "&#39;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
 }
 
 fn render_landing(briefing_md: &str) -> String {
-    format!(r##"<!DOCTYPE html>
+    format!(
+        r##"<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -479,7 +496,10 @@ curl http://localhost:8080/audit/export?from=2026-01-01 | tail -1</code></pre>
 
 </div>
 </body>
-</html>"##, briefing_md, heygen_deeplink(briefing_md))
+</html>"##,
+        briefing_md,
+        heygen_deeplink(briefing_md)
+    )
 }
 
 /// Build a HeyGen Studio deeplink from the briefing text. The user pastes
@@ -512,7 +532,8 @@ fn url_encode(s: &str) -> String {
 
 fn render_weekly(md: &str) -> String {
     let escaped = html_escape(md);
-    format!(r##"<!DOCTYPE html>
+    format!(
+        r##"<!DOCTYPE html>
 <html><head><title>ARGUS — Weekly Briefing</title>
 <style>body{{font-family:system-ui;max-width:780px;margin:40px auto;padding:0 20px;color:#222;line-height:1.6}}
 h1,h2{{color:#111}}pre{{background:#f6f6f6;padding:16px;border-radius:6px;white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:14px}}
@@ -522,7 +543,9 @@ a{{color:#06c}}</style>
 <h1>ARGUS — Weekly Briefing</h1>
 <p><a href="/">← Home</a></p>
 <pre>{}</pre>
-</body></html>"##, escaped)
+</body></html>"##,
+        escaped
+    )
 }
 
 const SUBMIT_HTML: &str = r##"<!DOCTYPE html>
@@ -672,11 +695,16 @@ async fn main() -> anyhow::Result<()> {
     // OpenTelemetry init [Refs: 6.3]. Opt-in via `ARGUS_OTEL_DISABLED`.
     let _otel_guard = argus_otel::init("argus-dashboard");
     let _ = tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,argus=debug")))
+        .with_env_filter(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::new("info,argus=debug")),
+        )
         .try_init();
 
     let port: u16 = std::env::var("ARGUS_DASHBOARD_PORT")
-        .ok().and_then(|s| s.parse().ok()).unwrap_or(3000);
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(3000);
 
     // The dashboard ALWAYS requires a NIM key in env. The form provides it per-request,
     // but for the /api/* endpoints the env is the fallback.
@@ -753,8 +781,11 @@ mod tests {
     #[test]
     fn heygen_deeplink_contains_https_app_heygen_com_video_translate() {
         let url = heygen_deeplink("Hello world, this is a test briefing.");
-        assert!(url.starts_with("https://app.heygen.com/video-translate?script="),
-            "url must start with HeyGen Studio base, got: {}", url);
+        assert!(
+            url.starts_with("https://app.heygen.com/video-translate?script="),
+            "url must start with HeyGen Studio base, got: {}",
+            url
+        );
         assert!(url.contains("Hello"));
     }
 
@@ -765,8 +796,11 @@ mod tests {
         // After truncation, the script param should have at most 2000 'a' chars,
         // which percent-encoded means 2000 'a' chars (no encoding needed for 'a').
         // The prefix is fixed: "https://app.heygen.com/video-translate?script=" = 47 chars.
-        assert!(url.len() < 47 + 2010,
-            "URL too long ({}) — truncation failed", url.len());
+        assert!(
+            url.len() < 47 + 2010,
+            "URL too long ({}) — truncation failed",
+            url.len()
+        );
     }
 
     #[test]

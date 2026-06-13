@@ -7,7 +7,6 @@
 //! messages signed by the agent are verifiable against its SPIFFE ID.
 
 use ed25519_dalek::{Signer, SigningKey, Verifier, VerifyingKey};
-use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -38,7 +37,9 @@ impl SpiffeId {
         ))
     }
 
-    pub fn as_str(&self) -> &str { &self.0 }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 
     /// Extract the role from the ID. Returns the segment after `argus/`.
     pub fn role(&self) -> Option<&str> {
@@ -95,7 +96,9 @@ mod tests {
     #[test]
     fn spiffe_id_format() {
         let id = SpiffeId::for_role("aegis-slop");
-        assert!(id.as_str().starts_with("spiffe://apohara.dev/argus/aegis-slop/instance/"));
+        assert!(id
+            .as_str()
+            .starts_with("spiffe://apohara.dev/argus/aegis-slop/instance/"));
     }
 
     #[test]

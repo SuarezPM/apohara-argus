@@ -67,9 +67,8 @@ struct MockState {
 impl MockGitHub {
     async fn start() -> Self {
         let state = Arc::new(MockState::default());
-        *state.diff.lock().await = Some(
-            "diff --git a/src/lib.rs b/src/lib.rs\n+pub fn new_function() {}\n".to_string(),
-        );
+        *state.diff.lock().await =
+            Some("diff --git a/src/lib.rs b/src/lib.rs\n+pub fn new_function() {}\n".to_string());
 
         let app = Router::new()
             .route(
@@ -363,7 +362,11 @@ async fn webhook_with_oversized_payload_returns_413() {
         "oversized payload must be rejected with 413"
     );
     let body = body_string(resp).await;
-    assert!(body.contains("too large"), "body explains the rejection: {}", body);
+    assert!(
+        body.contains("too large"),
+        "body explains the rejection: {}",
+        body
+    );
 
     assert_eq!(gh.state.comments.lock().await.len(), 0);
     assert_eq!(gh.state.labels.lock().await.len(), 0);
@@ -406,7 +409,11 @@ async fn webhook_with_unknown_event_is_ignored() {
 
     assert_eq!(resp.status(), StatusCode::OK);
     let body = body_string(resp).await;
-    assert!(body.contains("ignored"), "body explains the no-op: {}", body);
+    assert!(
+        body.contains("ignored"),
+        "body explains the no-op: {}",
+        body
+    );
 
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     assert_eq!(
