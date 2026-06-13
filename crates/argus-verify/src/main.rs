@@ -18,7 +18,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use argus_verify::{audit_export_handler, shutdown_signal, IdempotencyCache, VerifyWorker};
+use argus_verify::{a2a_message_handler, agent_card_handler, audit_export_handler, shutdown_signal, IdempotencyCache, VerifyWorker};
 use axum::{
     extract::State,
     http::HeaderMap,
@@ -90,11 +90,33 @@ async fn main() -> anyhow::Result<()> {
         .route("/audit/export", get(audit_export_handler))
         .with_state(audit_store);
 
+    // A2A sub-router (Roadmap 3.2). Opt-in via env var — default
+    // OFF so existing deployments don't expose new surface. To enable
+    // a Google-A2A orchestrator to discover and message us, set
+    // `ARGUS_A2A_DISABLED=false` (or unset the var).
+    let a2a_router = if std::env::var("ARGUS_A2A_DISABLED")
+        .ok()
+        .map(|v| v != "false" && v != "0" && v != "no")
+        .unwrap_or(false)
+    {
+        // Disabled: mount a 404 fallback at the well-known URL.
+        use argus_verify::routes::a2a_disabled_handler;
+        Router::new()
+            .route("/.well-known/agent-card.json", get(a2a_disabled_handler))
+            .route("/a2a/message", get(a2a_disabled_handler))
+            .route("/a2a/message", post(a2a_disabled_handler))
+    } else {
+        Router::new()
+            .route("/.well-known/agent-card.json", get(agent_card_handler))
+            .route("/a2a/message", post(a2a_message_handler))
+    };
+
     let app = Router::new()
         .route("/health", get(health))
         .route("/analyze", post(analyze))
         .with_state(state)
-        .merge(audit_router);
+        .merge(audit_router)
+        .merge(a2a_router);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     eprintln!("argus-verify listening on http://{}", addr);

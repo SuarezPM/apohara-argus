@@ -27,7 +27,7 @@ pub mod routes;
 pub mod shutdown;
 pub use audit_store::InMemoryAuditStore;
 pub use cache::IdempotencyCache;
-pub use routes::audit_export_handler;
+pub use routes::{audit_export_handler, a2a_message_handler, agent_card_handler, build_agent_card, AgentCard, A2AMessage, A2APart, AgentSkill};
 pub use shutdown::shutdown_signal;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
