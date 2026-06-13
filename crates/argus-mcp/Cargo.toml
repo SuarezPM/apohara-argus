@@ -1,0 +1,35 @@
+[package]
+name = "argus-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "ARGUS MCP server [Refs: 5] — exposes the 4 specialists (slop, security, arch, verdict) as MCP tools for Claude Code / Codex / Cursor."
+repository.workspace = true
+
+[[bin]]
+name = "argus-mcp"
+path = "src/main.rs"
+
+[lib]
+name = "argus_mcp"
+path = "src/lib.rs"
+
+[dependencies]
+argus-core = { workspace = true }
+argus-llm = { workspace = true }
+argus-slop = { workspace = true }
+argus-otel = { workspace = true }
+rmcp = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+serde_json = "1"
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = "1"
+thiserror = "1"
+async-trait = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }

@@ -13,6 +13,7 @@ members = [
   "crates/argus-dashboard",
   "crates/argus-cli",
   "crates/argus-otel",
+  "crates/argus-mcp",
 ]
 
 [workspace.package]
@@ -75,6 +76,15 @@ opentelemetry = "0.27"
 opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
 opentelemetry-stdout = { version = "0.27", features = ["trace"] }
 tracing-opentelemetry = "0.28"
+
+# MCP (Model Context Protocol) — official Rust SDK.
+# [Refs: 5] Exposes ARGUS's 4 specialists as MCP tools to Claude Code /
+# Codex / Cursor. Version 0.5 has the `#[tool]` macro API; `schemars` is
+# a direct dep (rmcp 0.5 does not re-export it). Must be >=1.0 for
+# `json_schema()` method that rmcp's macro calls. The `transport-io`
+# feature gates the stdio transport module (not `transport-stdio`).
+rmcp = { version = "0.5", features = ["server", "transport-io", "macros"] }
+schemars = "1"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 dotenvy = "0.15"
@@ -107,6 +117,7 @@ argus-verify = { path = "crates/argus-verify" }
 argus-lens = { path = "crates/argus-lens" }
 argus-agent = { path = "crates/argus-agent" }
 argus-otel = { path = "crates/argus-otel" }
+argus-mcp = { path = "crates/argus-mcp" }
 
 [profile.release]
 opt-level = 3
