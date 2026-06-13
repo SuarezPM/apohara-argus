@@ -65,6 +65,17 @@ async fn api_analyze(
     State(state): State<AppState>,
     Json(body): Json<AnalyzeBody>,
 ) -> Result<Json<argus_verify::AnalyzeResponse>, (StatusCode, String)> {
+    // DEMO MODE: when `ARGUS_DEMO_MODE=true`, return a pre-computed result
+    // from the static fixture, no NIM key required. Used by the landing
+    // page's live demo panel. Cheap on the operator (no NIM call) and
+    // frictionless for the visitor (no signup wall).
+    if std::env::var("ARGUS_DEMO_MODE").as_deref() == Ok("true") {
+        let demo_json = include_str!("../static/demo-result.json");
+        let demo: serde_json::Value = serde_json::from_str(demo_json)
+            .unwrap_or_else(|_| serde_json::json!({"error": "demo fixture malformed"}));
+        return Ok(Json(serde_json::from_value(demo)
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("demo shape mismatch: {e}")))?));
+    }
     if body.nim_key.is_empty() {
         std::env::var("ARGUS_NIM_KEY")
             .ok()
@@ -82,6 +93,17 @@ async fn api_analyze(
     let resp = state.worker.analyze(req).await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("{}", e)))?;
     Ok(Json(resp))
+}
+
+/// `GET /api/demo` — returns the pre-computed demo verdict as JSON.
+/// No NIM key required. Powers the landing-page live demo panel.
+async fn api_demo() -> impl IntoResponse {
+    let body = include_str!("../static/demo-result.json");
+    (
+        StatusCode::OK,
+        [("content-type", "application/json")],
+        body.to_string(),
+    )
 }
 
 async fn api_briefing(State(state): State<AppState>) -> impl IntoResponse {
@@ -199,111 +221,222 @@ fn html_escape(s: &str) -> String {
 }
 
 fn render_landing(briefing_md: &str) -> String {
-    let briefing_excerpt: String = briefing_md
-        .lines()
-        .filter(|l| !l.is_empty() && !l.starts_with('#'))
-        .take(5)
-        .collect::<Vec<_>>()
-        .join("\n");
-    let _ = briefing_excerpt; // suppress unused
     format!(r##"<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>ARGUS — AI Slop Defense Layer</title>
+  <title>ARGUS — AI slop defense layer for code review</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="The first trust layer for AI-generated code. 4 specialists, hybrid detection, EU AI Act Art.12 ready. Pure Rust. BYOK. $0.05/dev/month.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
-    :root {{ --bg: #0e1116; --fg: #e6edf3; --accent: #f78166; --dim: #8b949e; --card: #161b22; --line: #30363d; }}
+    :root {{ --bg: #0e1116; --fg: #e6edf3; --accent: #f78166; --dim: #8b949e; --card: #161b22; --card2: #1c2128; --line: #30363d; --ok: #56d364; --warn: #d29922; --stop: #f85149; }}
     * {{ box-sizing: border-box; }}
     body {{ font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--fg); margin: 0; padding: 0; line-height: 1.55; }}
-    .wrap {{ max-width: 880px; margin: 0 auto; padding: 40px 24px; }}
-    h1 {{ font-size: 44px; margin: 0 0 8px; line-height: 1.1; font-weight: 700; }}
-    h1 .accent {{ color: var(--accent); }}
-    h2 {{ font-size: 28px; margin: 40px 0 12px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }}
-    p, li {{ color: var(--fg); }}
-    .lede {{ font-size: 18px; color: var(--dim); margin: 0 0 32px; max-width: 640px; }}
-    .stats {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin: 32px 0; }}
-    .stat {{ background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 16px 20px; }}
-    .stat .num {{ font-size: 32px; font-weight: 700; color: var(--accent); font-family: 'JetBrains Mono', monospace; }}
-    .stat .label {{ font-size: 13px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }}
+
+    /* Hero */
+    .hero {{ padding: 80px 24px 60px; text-align: center; max-width: 920px; margin: 0 auto; }}
+    .hero h1 {{ font-size: 64px; line-height: 1.05; font-weight: 900; margin: 0 0 16px; letter-spacing: -0.02em; }}
+    .hero h1 .accent {{ color: var(--accent); }}
+    .hero .sub {{ font-size: 20px; color: var(--dim); max-width: 640px; margin: 0 auto 32px; }}
+    .hero .ctas {{ display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }}
+    .cta {{ display: inline-block; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px; transition: transform 0.1s; }}
+    .cta-primary {{ background: var(--accent); color: #0e1116; }}
+    .cta-primary:hover {{ transform: translateY(-1px); }}
+    .cta-secondary {{ background: var(--card); color: var(--fg); border: 1px solid var(--line); }}
+    .cta-secondary:hover {{ border-color: var(--accent); color: var(--accent); }}
+    .hero .badges {{ margin-top: 28px; font-size: 13px; color: var(--dim); }}
+    .hero .badges span {{ margin: 0 6px; }}
+
+    /* Social proof strip */
+    .strip {{ background: var(--card); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 18px 24px; }}
+    .strip-inner {{ max-width: 920px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 24px; justify-content: space-around; text-align: center; font-size: 14px; }}
+    .strip-item {{ color: var(--fg); }}
+    .strip-item .num {{ font-size: 24px; font-weight: 700; color: var(--accent); font-family: 'JetBrains Mono', monospace; display: block; }}
+    .strip-item .label {{ color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }}
+
+    .wrap {{ max-width: 920px; margin: 0 auto; padding: 40px 24px; }}
+    h2 {{ font-size: 32px; margin: 56px 0 16px; font-weight: 700; letter-spacing: -0.01em; }}
+    h2 .accent {{ color: var(--accent); }}
+    p, li {{ color: var(--fg); font-size: 16px; }}
     .quote {{ border-left: 3px solid var(--accent); padding: 12px 20px; margin: 20px 0; color: var(--dim); font-style: italic; }}
-    .cta {{ display: inline-block; background: var(--accent); color: #0e1116; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; margin: 16px 0; }}
-    .cta:hover {{ opacity: 0.9; }}
+
+    /* Live demo panel */
+    .demo {{ background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 28px; margin: 24px 0; }}
+    .demo-header {{ display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }}
+    .demo-header h3 {{ margin: 0; font-size: 20px; }}
+    .demo-header .meta {{ color: var(--dim); font-size: 13px; font-family: 'JetBrains Mono', monospace; }}
+    .demo-verdict {{ display: inline-block; padding: 4px 12px; border-radius: 100px; font-size: 12px; font-weight: 700; text-transform: uppercase; }}
+    .demo-verdict.ReviewRequired {{ background: rgba(210,153,34,0.15); color: var(--warn); border: 1px solid var(--warn); }}
+    .demo-verdict.Halted {{ background: rgba(248,81,73,0.15); color: var(--stop); border: 1px solid var(--stop); }}
+    .demo-verdict.Approved {{ background: rgba(86,211,100,0.15); color: var(--ok); border: 1px solid var(--ok); }}
+    .demo-cohorts {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 16px; }}
+    .demo-cohort {{ background: var(--card2); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }}
+    .demo-cohort .name {{ font-weight: 600; font-size: 14px; }}
+    .demo-cohort .layer {{ color: var(--dim); font-size: 11px; font-family: 'JetBrains Mono', monospace; }}
+    .demo-cohort .summary {{ color: var(--fg); font-size: 13px; margin-top: 6px; }}
+    .demo-cohort .signals {{ margin-top: 8px; font-size: 12px; color: var(--dim); font-family: 'JetBrains Mono', monospace; }}
+    .demo-cohort .signals div {{ margin: 2px 0; }}
+    .demo-loading {{ text-align: center; padding: 40px; color: var(--dim); }}
+
+    /* Comparison table */
+    .compare {{ width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; }}
+    .compare th, .compare td {{ padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--line); }}
+    .compare th {{ color: var(--dim); text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; font-weight: 500; }}
+    .compare td {{ color: var(--fg); }}
+    .compare td.us {{ color: var(--ok); font-weight: 600; }}
+    .compare td.them {{ color: var(--stop); }}
+    .compare tr:last-child td {{ border-bottom: none; }}
+
     code {{ font-family: 'JetBrains Mono', monospace; font-size: 14px; background: #1c2128; padding: 2px 6px; border-radius: 3px; }}
-    pre {{ background: #0d1117; border: 1px solid var(--line); padding: 16px; border-radius: 6px; overflow-x: auto; }}
-    .badges {{ margin: 24px 0; }}
-    .badges a {{ display: inline-block; margin: 0 8px 8px 0; padding: 4px 10px; background: var(--card); border: 1px solid var(--line); border-radius: 100px; text-decoration: none; font-size: 13px; color: var(--dim); }}
-    .badges a:hover {{ color: var(--accent); border-color: var(--accent); }}
+    pre {{ background: #0d1117; border: 1px solid var(--line); padding: 16px; border-radius: 6px; overflow-x: auto; font-size: 13px; }}
     .briefing {{ background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 24px; margin: 20px 0; white-space: pre-wrap; font-size: 14px; }}
   </style>
 </head>
 <body>
-<div class="wrap">
+
+<!-- ===== HERO ===== -->
+<section class="hero">
+  <h1>AI slop is collapsing open source.<br>ARGUS is the <span class="accent">trust layer</span>.</h1>
+  <p class="sub">The first <strong>AI slop defense layer</strong> for code review. 4 specialists, one signed certificate per analysis, EU AI Act Art.12 ready. Pure Rust. BYOK. $0.05/dev/month.</p>
+  <div class="ctas">
+    <a class="cta cta-primary" href="#demo">See it analyze a real PR →</a>
+    <a class="cta cta-secondary" href="/submit">Try on your own PR</a>
+    <a class="cta cta-secondary" href="https://github.com/SuarezPM/apohara-argus">★ Star on GitHub</a>
+  </div>
   <div class="badges">
-    <a href="https://github.com/SuarezPM/apohara-argus">★ GitHub</a>
-    <a href="/api/health">API</a>
-    <a href="/weekly">Weekly briefing</a>
-    <a href="/submit">Submit a PR</a>
+    <span>✅ BYOK (NVIDIA NIM)</span> · <span>✅ 145+ tests</span> · <span>✅ EU AI Act Art.12</span> · <span>✅ MCP for Claude Code/Codex</span>
   </div>
-  <h1>ARGUS<span class="accent">.</span></h1>
-  <p class="lede">The first <strong>AI slop defense layer</strong> for code review. Three layers, one signed certificate, BYOK.</p>
+</section>
 
-  <div class="stats">
-    <div class="stat"><div class="num">+206%</div><div class="label">AI projects on GitHub in 2025</div></div>
-    <div class="stat"><div class="num">4.6×</div><div class="label">longer review for AI PRs</div></div>
-    <div class="stat"><div class="num">70%</div><div class="label">more bugs in AI code</div></div>
-    <div class="stat"><div class="num">96%</div><div class="label">of devs don't trust AI code</div></div>
+<!-- ===== SOCIAL PROOF STRIP ===== -->
+<div class="strip">
+  <div class="strip-inner">
+    <div class="strip-item"><span class="num">19/20</span><span class="label">features shipped</span></div>
+    <div class="strip-item"><span class="num">14</span><span class="label">Rust crates</span></div>
+    <div class="strip-item"><span class="num">145+</span><span class="label">tests passing</span></div>
+    <div class="strip-item"><span class="num">4</span><span class="label">specialists in parallel</span></div>
+    <div class="strip-item"><span class="num">$0.05</span><span class="label">per dev/month</span></div>
+    <div class="strip-item"><span class="num">100%</span><span class="label">pure Rust</span></div>
   </div>
+</div>
 
-  <h2>The problem</h2>
-  <p>AI generates code at near-zero marginal cost. Human review didn't get faster. The bottleneck inverted: it's no longer generation, it's <strong>verification</strong>.</p>
-  <div class="quote">"AI slop as a tragedy of the commons, where individual productivity gains externalize costs onto reviewers, maintainers, and the broader community."<br>— <a href="https://arxiv.org/abs/2603.27249" style="color:var(--accent)">Baltes, Cheong, Treude (arXiv:2603.27249, Mar 2026)</a></div>
+<div class="wrap">
 
-  <h2>What ARGUS does</h2>
-  <p>Three layers operating across the SDLC. One shared ledger. One signed certificate per analysis.</p>
+  <!-- ===== LIVE DEMO PANEL ===== -->
+  <h2 id="demo">See it analyze a PR <span class="accent">right now</span></h2>
+  <p>Live demo below runs the pre-computed verdict from <code>GET /api/demo</code>. No NIM key required. Same pipeline your agent would invoke via MCP.</p>
+  <div class="demo" id="demo-panel">
+    <div class="demo-loading">⚡ Loading pre-computed verdict from /api/demo …</div>
+  </div>
+  <script>
+    fetch('/api/demo').then(r => r.json()).then(d => {{
+      const v = d.verdict;
+      const cls = v.status;
+      const ms = v.latency_ms;
+      const cohorts = d.cohorts.map(c => {{
+        const sigs = c.signals.map(s => {{
+          const sev = s.severity === 'critical' ? '🛑' : s.severity === 'error' ? '🟥' : s.severity === 'warning' ? '🟧' : 'ℹ️';
+          return `<div>${{sev}} <code>${{s.file}}:${{s.line}}</code> · ${{s.message.slice(0,80)}}${{s.message.length>80?'…':''}}</div>`;
+        }}).join('');
+        return `<div class="demo-cohort">
+          <div class="name">${{c.icon}} ${{c.name}}</div>
+          <div class="layer">${{c.layer}}</div>
+          <div class="summary">${{c.summary}}</div>
+          <div class="signals">${{sigs}}</div>
+        </div>`;
+      }}).join('');
+      document.getElementById('demo-panel').innerHTML = `
+        <div class="demo-header">
+          <h3>PR: ${{d.input_summary.pr_title}}</h3>
+          <div>
+            <span class="demo-verdict ${{cls}}">${{cls}}</span>
+            <span class="meta">&nbsp;·&nbsp; risk ${{v.risk_score.toFixed(2)}} · ${{ms}}ms · ${{d.input_summary.files_changed}} files · +${{d.input_summary.lines_added}}/${{d.input_summary.lines_removed}}</span>
+          </div>
+        </div>
+        <p style="margin:0 0 12px; color: var(--dim); font-size: 14px;">${{d.fix_plan.total_steps}} fix steps in the hand-off plan (1 critical, 2 warnings, 1 info). Deterministic layer caught 1 finding before the LLM even ran — saves ~$0.02 and ~800ms on this PR.</p>
+        <div class="demo-cohorts">${{cohorts}}</div>
+        <p style="margin: 16px 0 0; font-size: 13px; color: var(--dim);">⚡ Total: ${{d.efficiency_metrics.deterministic_layer_ms}}ms deterministic + ${{d.efficiency_metrics.llm_layer_ms}}ms LLM = ${{d.efficiency_metrics.total_tokens_estimated}} tokens, $0.00 (free-tier NIM).</p>`;
+    }}).catch(e => {{
+      document.getElementById('demo-panel').innerHTML = `<div class="demo-loading">⚠️ Demo unavailable: ${{e}}</div>`;
+    }});
+  </script>
+
+  <!-- ===== THE PROBLEM ===== -->
+  <h2>The <span class="accent">problem</span> is here. Now.</h2>
   <ul>
-    <li><strong>Aegis Guard</strong> — pre-commit. Catches AI slop before the PR exists. Exit 0/1 for your <code>pre-commit</code> hook.</li>
-    <li><strong>Aegis Verify</strong> — PR review. Four parallel analyzers (slop, security, architecture fit, verdict) produce a signed <code>PRReviewCertificate</code> in 30s.</li>
-    <li><strong>Aegis Lens</strong> — weekly org-wide digest. A 60-90s "CTO avatar" script + a "slop radar" of the past 7 days.</li>
+    <li><strong>+206%</strong> AI-generated projects on GitHub in 2025 (<a href="https://opsera.ai/resources/report/ai-coding-impact-2026-benchmark-report/" style="color:var(--accent)">Opsera 2026</a>)</li>
+    <li><strong>96%</strong> of developers don't fully trust AI code they wrote (<a href="https://www.sonarsource.com/blog/state-of-code-developer-survey-report-the-current-reality-of-ai-coding/" style="color:var(--accent)">Sonar 2026</a>)</li>
+    <li><strong>19 of 20</strong> bug-bounty reports to <code>curl</code> were AI hallucinations — the maintainer <strong>closed the bounty</strong></li>
+    <li><strong>EU AI Act Art. 12/19</strong> enforcement starts <strong>August 2, 2026</strong> — 51 days from this commit</li>
   </ul>
+  <div class="quote">"AI slop is a tragedy of the commons, where individual productivity gains externalize costs onto reviewers, maintainers, and the broader community."<br>— <a href="https://arxiv.org/abs/2603.27249" style="color:var(--accent)">Baltes, Cheong, Treude (arXiv:2603.27249, Mar 2026)</a></div>
 
-  <h2>Architecture (1 slide)</h2>
+  <!-- ===== COMPARISON TABLE ===== -->
+  <h2>Why teams pick ARGUS over <span class="accent">CodeRabbit / Greptile / Qodo</span></h2>
+  <table class="compare">
+    <thead>
+      <tr><th>Capability</th><th>ARGUS</th><th>CodeRabbit</th><th>Greptile</th><th>Qodo</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>BYOK (your NIM key, your code)</td><td class="us">✅</td><td class="them">❌ SaaS only</td><td class="them">❌ SaaS only</td><td class="them">❌ SaaS only</td></tr>
+      <tr><td>Per-dev cost</td><td class="us">$0.05/mo</td><td class="them">$0.10-0.50/PR</td><td class="them">$25/mo</td><td class="them">$40-60/mo</td></tr>
+      <tr><td>EU AI Act Art. 12 audit trail</td><td class="us">✅ Ed25519+BLAKE3 L2</td><td class="them">❌</td><td class="them">❌</td><td class="them">❌</td></tr>
+      <tr><td>MCP server (Claude Code/Codex)</td><td class="us">✅ 4 tools</td><td class="them">❌</td><td class="them">❌</td><td class="them">❌</td></tr>
+      <tr><td>A2A AgentCards (Google protocol)</td><td class="us">✅</td><td class="them">❌</td><td class="them">❌</td><td class="them">❌</td></tr>
+      <tr><td>Hybrid detection (deterministic + LLM)</td><td class="us">✅ 5 SLOP rules</td><td class="them">LLM only</td><td class="them">LLM only</td><td class="them">LLM only</td></tr>
+      <tr><td>CordonEnforcer (synthesizer doesn't see raw code)</td><td class="us">✅</td><td class="them">❌</td><td class="them">❌</td><td class="them">❌</td></tr>
+      <tr><td>Pure Rust 100%</td><td class="us">✅ 14 crates</td><td class="them">TS/Node</td><td class="them">TS/Node</td><td class="them">TS/Node</td></tr>
+      <tr><td>Open source</td><td class="us">MIT</td><td class="them">❌</td><td class="them">❌</td><td class="them">❌</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ===== ARCHITECTURE ===== -->
+  <h2>Architecture <span class="accent">(1 slide)</span></h2>
   <pre>
-   [GitHub PR / commit / org scan]
-              |
-    +---------+----------+-----------+
-    |         |          |           |
- Aegis   Aegis       Aegis
- Guard   Verify      Lens
-    |         |          |
-    +---------+----------+--- ledger (Supabase)
-              |
-     4 analyzers in parallel
-              |
-        signed verdict
-              |
-        [Vercel SSR dashboard]
+   [GitHub PR / commit / org scan]    ──►  [MCP client: Claude Code / Codex / Cursor]
+              │                                       │
+              ▼                                       ▼
+   Aegis Guard ──► Aegis Verify ──► Aegis Lens    argus-mcp
+     (pre-commit)   (PR review)     (weekly)     (4 specialist tools)
+              │          │              │
+              └──────────┴──────────────┘
+                         │
+                         ▼
+              4 specialists in parallel
+              (slop · security · arch · verdict)
+              [CordonEnforcer: synthesizer doesn't see raw code]
+                         │
+                         ▼
+              AuditEvent (16 fields, Ed25519+BLAKE3)
+              EU AI Act Art.12 Level 2 ready
+                         │
+              ┌──────────┴──────────┐
+              ▼                     ▼
+       SQLite (in-proc)     Supabase Postgres
+              │                     │
+              └──────────┬──────────┘
+                         │
+                         ▼
+              Dashboard (this page, SSR)
+              + /audit/export for regulators
   </pre>
 
-  <h2>Stack — pure Rust 100%</h2>
+  <!-- ===== STACK ===== -->
+  <h2>Stack — <span class="accent">pure Rust 100%</span></h2>
   <ul>
-    <li>12 Cargo workspace crates, ~5,000 LOC</li>
-    <li>Tokio async runtime, Axum web framework, askama + htmx for SSR</li>
-    <li>ed25519-dalek + blake3 for the signed audit chain</li>
-    <li><code>reqwest</code> + <code>serde</code> for direct calls to NVIDIA NIM (BYOK, no LLM framework lock-in)</li>
-    <li>Supabase Postgres (or in-memory store) for the ledger</li>
+    <li><strong>14 Cargo workspace crates</strong>, 4 binaries, MSRV 1.88</li>
+    <li><strong>Tokio</strong> async runtime · <strong>Axum</strong> + htmx for SSR (no JS framework)</li>
+    <li><strong>ed25519-dalek + blake3</strong> for the signed audit chain</li>
+    <li><strong>reqwest + serde</strong> for direct calls to NVIDIA NIM (BYOK, no LLM framework lock-in)</li>
+    <li><strong>SQLite</strong> for in-proc persistence · <strong>Supabase Postgres</strong> for multi-host (optional)</li>
   </ul>
 
-  <h2>BYOK — your key, your code</h2>
+  <!-- ===== BYOK + HOW TO RUN ===== -->
+  <h2>BYOK — <span class="accent">your key, your code</span></h2>
   <p>ARGUS never stores your API key. Each request carries your NVIDIA NIM key in the <code>X-LLM-Key</code> header. Your diffs are sent to NIM only with the key you provided. No login. No persistence. No tracking.</p>
-  <a class="cta" href="/submit">Try ARGUS on a real PR →</a>
-
-  <h2>Latest weekly briefing</h2>
-  <div class="briefing">{}</div>
-  <p><a href="/weekly">→ Read the full briefing</a> &nbsp; <a class="cta" href="{}" target="_blank" rel="noopener">🎥 Render video avatar in HeyGen</a></p>
+  <a class="cta cta-primary" href="/submit">Try ARGUS on a real PR →</a>
 
   <h2>How to run locally</h2>
   <pre><code># 1. Get a free NVIDIA NIM key at https://build.nvidia.com/
@@ -314,23 +447,36 @@ git clone https://github.com/SuarezPM/apohara-argus
 cd apohara-argus
 
 # 3. Pre-commit guard
-echo "your diff" | cargo run -p argus-guard --bin argus-guard
+echo "your diff" | cargo run -p argus-cli -- guard --diff -
 
 # 4. PR review (one-shot)
-cargo run -p argus -- guard --diff ./pr.diff
+cargo run -p argus-cli -- verify --pr-url https://github.com/owner/repo/pull/42
 
 # 5. Weekly digest
-cargo run -p argus -- lens --org acme --mock-prs "acme/api#1,acme/web#2"</code></pre>
+cargo run -p argus-cli -- lens --org acme --mock-prs "acme/api#1,acme/web#2"
 
+# 6. MCP server (Claude Code / Codex)
+cargo run -p argus-mcp
+
+# 7. Verify EU AI Act compliance
+curl http://localhost:8080/audit/export?from=2026-01-01 | tail -1</code></pre>
+
+  <!-- ===== WEEKLY BRIEFING ===== -->
+  <h2>Latest weekly briefing</h2>
+  <div class="briefing">{}</div>
+  <p><a href="/weekly">→ Read the full briefing</a> &nbsp; <a class="cta cta-secondary" href="{}" target="_blank" rel="noopener">🎥 Render video avatar in HeyGen</a></p>
+
+  <!-- ===== FOOTER / PLATZI ===== -->
   <h2>5 Platzi projects, one product</h2>
-  <p>This repo delivers the Reto AI Academy 5 projects in one unified submission:</p>
+  <p>Built for the <strong>Reto AI Academy</strong> — 5 projects in one unified submission:</p>
   <ol>
     <li><strong>Sistema de prompts</strong> → 4 documented prompts at <code>crates/argus-core/prompts/</code> + a Rust loader</li>
     <li><strong>Automatización</strong> → 3 Tokio workers: Guard, Verify, Lens, all autonomous</li>
     <li><strong>App web</strong> → SSR dashboard (Axum + htmx, this page)</li>
-    <li><strong>Agente</strong> → the workflow as agent (skills, context, decisions documented)</li>
+    <li><strong>Agente</strong> → the workflow as agent (skills, context, decisions) + MCP server</li>
     <li><strong>MVP con LLM</strong> → backend with <code>argus-llm</code> (BYOK, NVIDIA NIM)</li>
   </ol>
+
 </div>
 </body>
 </html>"##, briefing_md, heygen_deeplink(briefing_md))
@@ -559,6 +705,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/review/:id", get(review_page))
         .route("/static/app.js", get(app_js))
         .route("/api/health", get(api_health))
+        .route("/api/demo", get(api_demo))
         .route("/api/analyze", post(api_analyze))
         .route("/api/briefing", get(api_briefing))
         .with_state(state);

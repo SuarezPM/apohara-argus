@@ -1,0 +1,147 @@
+{
+  "demo_mode": true,
+  "note": "Pre-computed result from a real-looking fake PR. Used by the landing-page live demo panel — no NIM key required.",
+  "input_summary": {
+    "pr_title": "feat: add user authentication",
+    "files_changed": 4,
+    "lines_added": 87,
+    "lines_removed": 12
+  },
+  "verdict": {
+    "status": "ReviewRequired",
+    "risk_score": 0.62,
+    "latency_ms": 4830
+  },
+  "cohorts": [
+    {
+      "id": "aegis_slop",
+      "name": "Aegis Slop",
+      "icon": "🔍",
+      "layer": "deterministic + LLM",
+      "signals": [
+        {
+          "rule": "SLOP-001",
+          "severity": "warning",
+          "file": "src/auth/login.rs",
+          "line": 42,
+          "message": "Function 'verify_credentials' is 94 LOC (> 80) — split into smaller helpers"
+        },
+        {
+          "rule": "SLOP-002",
+          "severity": "error",
+          "file": "src/auth/login.rs",
+          "line": 71,
+          "message": "Error arm discards error silently: `Err(_) => {}`"
+        },
+        {
+          "rule": "SLOP-004",
+          "severity": "warning",
+          "file": "src/auth/session.rs",
+          "line": 23,
+          "message": ".unwrap() in non-test function 'create_session'"
+        }
+      ],
+      "summary": "3 slop signals (1 error, 2 warnings) — deterministic pass caught the swallowed error before LLM ran"
+    },
+    {
+      "id": "aegis_security",
+      "name": "Aegis Security",
+      "icon": "🛡️",
+      "layer": "LLM (redteam-security prompt)",
+      "signals": [
+        {
+          "rule": "CWE-798",
+          "severity": "critical",
+          "file": "src/auth/login.rs",
+          "line": 15,
+          "message": "Hardcoded credential: `JWT_SECRET = \"dev-secret-do-not-use-in-prod\"`"
+        },
+        {
+          "rule": "CWE-307",
+          "severity": "warning",
+          "file": "src/auth/login.rs",
+          "line": 58,
+          "message": "Login attempt limiter disabled in production: `MAX_ATTEMPTS = 0`"
+        }
+      ],
+      "summary": "2 security findings (1 CRITICAL — hardcoded JWT secret)"
+    },
+    {
+      "id": "aegis_arch",
+      "name": "Aegis Arch",
+      "icon": "🏛️",
+      "layer": "LLM (architecture-fit prompt)",
+      "signals": [
+        {
+          "rule": "ARCH-002",
+          "severity": "info",
+          "file": "src/auth/",
+          "line": 0,
+          "message": "Auth module doesn't follow the existing trait-based DI pattern used elsewhere in the repo"
+        }
+      ],
+      "summary": "Arch fit: 0.74 — Good with minor concerns about module conventions"
+    },
+    {
+      "id": "aegis_verdict",
+      "name": "Aegis Verdict",
+      "icon": "⚖️",
+      "layer": "LLM (verdict-synthesizer prompt)",
+      "signals": [
+        {
+          "rule": "BLOCK",
+          "severity": "critical",
+          "file": "src/auth/login.rs",
+          "line": 15,
+          "message": "Cannot merge: hardcoded JWT secret in source. Move to env var + secret manager before deploy."
+        }
+      ],
+      "summary": "Verdict: Halt on 1 critical, fix 3 warnings, approve 1 info. FixPlan with 4 steps generated."
+    }
+  ],
+  "fix_plan": {
+    "total_steps": 4,
+    "by_severity": {
+      "critical": 1,
+      "warning": 2,
+      "info": 1
+    },
+    "steps": [
+      {
+        "kind": "security_patch",
+        "file": "src/auth/login.rs",
+        "line_range": [15, 15],
+        "description": "Replace hardcoded JWT_SECRET with env var: `JWT_SECRET = std::env::var(\"JWT_SECRET\").expect(\"JWT_SECRET must be set\")`",
+        "severity": "critical"
+      },
+      {
+        "kind": "remove_code",
+        "file": "src/auth/login.rs",
+        "line_range": [71, 71],
+        "description": "Replace `Err(_) => {}` with explicit error handling: `Err(e) => { tracing::error!(\"verify failed: {e}\"); return Err(AuthError::Invalid); }`",
+        "severity": "warning"
+      },
+      {
+        "kind": "modify_function",
+        "file": "src/auth/login.rs",
+        "line_range": [1, 95],
+        "description": "Split 94-LOC `verify_credentials` into 3 helpers: `check_password_format`, `verify_hash`, `build_session_token`",
+        "severity": "warning"
+      },
+      {
+        "kind": "add_test",
+        "file": "src/auth/login.rs",
+        "line_range": [23, 23],
+        "description": "Replace `.unwrap()` with proper error: `create_session().ok_or(AuthError::SessionExpired)?`",
+        "severity": "info"
+      }
+    ]
+  },
+  "efficiency_metrics": {
+    "deterministic_layer_ms": 12,
+    "llm_layer_ms": 4818,
+    "total_tokens_estimated": 14820,
+    "cost_usd": 0.0,
+    "llm_calls_skipped": 2
+  }
+}
