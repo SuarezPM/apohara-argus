@@ -1,11 +1,11 @@
 [package]
-name = "argus-cli"
+name = "apohara-argus-mcp"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "Unified CLI for ARGUS. `argus health`, `argus verify`, `argus guard`, `argus lens` — all surfaces in one binary."
+description = "MCP server exposing 4 specialists (aegis_slop, aegis_security, aegis_arch, aegis_verdict) to Claude Code, Codex, and Cursor."
 repository.workspace = true
 homepage.workspace = true
 documentation.workspace = true
@@ -16,24 +16,28 @@ include = ["src/**/*.rs", "Cargo.toml", "README.md", "LICENSE"]
 publish = true
 
 [[bin]]
-name = "argus"
+name = "argus-mcp"
 path = "src/main.rs"
 
+[lib]
+name = "apohara_argus_mcp"
+path = "src/lib.rs"
+
 [dependencies]
-argus-core = { workspace = true }
-argus-otel = { workspace = true }
+apohara-argus-core = { workspace = true }
 argus-llm = { workspace = true }
 argus-slop = { workspace = true }
-argus-crypto = { workspace = true }
-argus-github = { workspace = true }
-argus-guard = { workspace = true }
-argus-verify = { workspace = true }
-argus-lens = { workspace = true }
-clap = { workspace = true }
+argus-otel = { workspace = true }
+rmcp = { workspace = true }
+schemars = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
+serde_json = "1"
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-anyhow = { workspace = true }
-chrono = { workspace = true }
+anyhow = "1"
+thiserror = "1"
+async-trait = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }

@@ -1,7 +1,7 @@
 //! VerdictSynthesizer — emits the final verdict from the 3 analyzer outputs.
 
 use super::{extract_json, Analyzer, SlopError};
-use argus_core::{RiskScore, Verdict, VerdictStatus};
+use apohara_argus_core::{RiskScore, Verdict, VerdictStatus};
 use async_trait::async_trait;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};

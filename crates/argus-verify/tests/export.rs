@@ -6,7 +6,7 @@
 //! populate the `InMemoryAuditStore` directly and verify the wire
 //! shape of the NDJSON response.
 
-use argus_core::{AuditEvent, DataClass, DecisionArtifact};
+use apohara_argus_core::{AuditEvent, DataClass, DecisionArtifact};
 use argus_verify::{audit_export_handler, InMemoryAuditStore};
 use axum::{
     body::to_bytes,

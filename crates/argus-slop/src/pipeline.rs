@@ -6,7 +6,7 @@ use super::security::SecurityReport;
 use super::slop_detector::SlopReport;
 use super::verdict::VerdictSynthesizer;
 use super::Analyzer;
-use argus_core::{RiskScore, Verdict, VerdictStatus};
+use apohara_argus_core::{RiskScore, Verdict, VerdictStatus};
 use argus_llm::LlmClient;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};

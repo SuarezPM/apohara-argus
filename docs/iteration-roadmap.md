@@ -42,7 +42,7 @@
 **HIGH PRIORITY — Adopt the spec's JSON schema for our audit records**
 
 ```rust
-// crates/argus-core/src/decision_record.rs
+// crates/apohara-argus-core/src/decision_record.rs
 use serde::{Deserialize, Serialize};
 use blake3::Hash;
 
@@ -72,7 +72,7 @@ pub struct DecisionRecord {
 }
 ```
 
-Files: `crates/argus-core/src/types.rs`, `crates/argus-crypto/src/ledger.rs`
+Files: `crates/apohara-argus-core/src/types.rs`, `crates/argus-crypto/src/ledger.rs`
 Effort: **M** (4-6 hours)
 Compliance gain: **Level 2 (Full)** conformance per the open spec. Marketing-grade.
 
@@ -90,7 +90,7 @@ Compliance gain: Removes GDPR derivative liability per Apr 2026 Commission Q&A.
 **LOW PRIORITY — Add retention policy config**
 
 ```rust
-// crates/argus-core/src/config.rs
+// crates/apohara-argus-core/src/config.rs
 pub struct RetentionConfig {
     pub default_days: u32,    // Default 730 (2 years, GDPR-aligned)
     pub high_risk_days: u32,  // Default 2555 (7 years, Article 19)
@@ -130,7 +130,7 @@ Reasoning:
 **LOW PRIORITY — Add MCP server support to expose our analyzers**
 
 ```rust
-// crates/argus-mcp/src/lib.rs (NEW crate, ~300 LOC)
+// crates/apohara-argus-mcp/src/lib.rs (NEW crate, ~300 LOC)
 use rmcp::{Server, tool};
 // Expose argus-slop, argus-verify, argus-lens as MCP tools
 // so Claude Code / Codex / Cursor can call us
@@ -290,7 +290,7 @@ pub fn to_sarif(findings: &[SlopFinding]) -> serde_json::Value {
 ```
 
 CLI: `argus scan --format=sarif > results.sarif`
-Files: `crates/argus-slop/src/sarif.rs`, `crates/argus-cli/src/commands/scan.rs`
+Files: `crates/argus-slop/src/sarif.rs`, `crates/apohara-argus-cli/src/commands/scan.rs`
 Effort: **S** (2 hours)
 Impact: Direct integration with GitHub Security tab. Zero-config surfacing.
 

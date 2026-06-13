@@ -6,14 +6,14 @@
 
 | Item | Crates touched | Conflicts with |
 |------|----------------|------------------|
-| **6.3 OpenTelemetry** | argus-verify/main.rs, argus-cli/main.rs, argus-dashboard/main.rs | 1.1 (dashboard), 2.2 (verify), 6.2 (verify) — all currently in flight |
+| **6.3 OpenTelemetry** | argus-verify/main.rs, apohara-argus-cli/main.rs, argus-dashboard/main.rs | 1.1 (dashboard), 2.2 (verify), 6.2 (verify) — all currently in flight |
 | **3.2 A2A AgentCards** | argus-verify/main.rs, Cargo.toml | 2.2, 6.2 (verify) |
-| **1.2 Agent hand-off** | argus-verify/lib.rs, argus-core/types.rs | 2.2 (verify), but the types.rs add is independent |
+| **1.2 Agent hand-off** | argus-verify/lib.rs, apohara-argus-core/types.rs | 2.2 (verify), but the types.rs add is independent |
 | **6.4 SQLite persistence** | argus-verify/main.rs (new store), Cargo.toml | 2.2 (verify), depends on 2.2 completion |
 | **7.1 HeyGen deeplink** | argus-dashboard/main.rs | 1.1 (dashboard) |
 
 **Dispatch order (after deps clear):**
-1. **1.2 first** (touches argus-core/types.rs + argus-verify/lib.rs — but types.rs is independent; verify/lib.rs can be edited after 2.2 commits)
+1. **1.2 first** (touches apohara-argus-core/types.rs + argus-verify/lib.rs — but types.rs is independent; verify/lib.rs can be edited after 2.2 commits)
 2. **3.2 second** (after 2.2, before 6.4)
 3. **6.4 third** (after 2.2 schema confirmed; before 6.3)
 4. **7.1 fourth** (after 1.1 cohort view committed; 1h task)
@@ -26,7 +26,7 @@
 **Category:** `unspecified-high`
 **Skills:** none
 **Files:**
-- `crates/argus-core/src/types.rs` — add `FixPlan`, `FixStep`, `FixStepKind` enums + structs
+- `crates/apohara-argus-core/src/types.rs` — add `FixPlan`, `FixStep`, `FixStepKind` enums + structs
 - `crates/argus-verify/src/lib.rs` — populate FixPlan in `analyze()` after verdict synthesis
 - `crates/argus-verify/src/handler.rs` (or wherever the response is built) — include `fix_plan` in `AnalyzeResponse`
 
@@ -90,7 +90,7 @@
 **Files:**
 - `Cargo.toml` (workspace) — add `tracing-opentelemetry = "0.33"`, `opentelemetry = "0.27"`, `opentelemetry-otlp = "0.27"` (stdout exporter)
 - `crates/argus-verify/src/main.rs` — init tracer
-- `crates/argus-cli/src/main.rs` — init tracer
+- `crates/apohara-argus-cli/src/main.rs` — init tracer
 - `crates/argus-dashboard/src/main.rs` — init tracer
 - `.env.example` — add OTEL env vars
 
@@ -113,7 +113,7 @@
 ## Wave 6 (deferred, dispatch after Wave 5)
 
 - **4 EU AI Act Level 2** (deep, 20h) — `certifieddata/ai-decision-logging-spec` conformance, validators
-- **5 MCP server** (deep, 24h) — new `crates/argus-mcp/` workspace member
+- **5 MCP server** (deep, 24h) — new `crates/apohara-argus-mcp/` workspace member
 - **7.2 BYVK opt-in** (unspecified-high, 8h) — feature flag-gated HeyGen/D-ID integration
 
 ## Wave 7 (final)

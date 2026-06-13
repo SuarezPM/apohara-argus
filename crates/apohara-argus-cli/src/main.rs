@@ -72,7 +72,7 @@ enum Cmd {
 async fn main() -> ExitCode {
     // OpenTelemetry init [Refs: 6.3]. Opt-in via `ARGUS_OTEL_DISABLED`.
     // The `try_init` is a no-op when OTel is disabled.
-    let _otel_guard = argus_otel::init("argus-cli");
+    let _otel_guard = argus_otel::init("apohara-argus-cli");
     let _ = tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
@@ -170,9 +170,9 @@ async fn main() -> ExitCode {
                 eprintln!("\nLedger hash: {}", resp.review.ledger_signature);
             }
             let exit = match resp.verdict.status {
-                argus_core::VerdictStatus::Approved => 0,
-                argus_core::VerdictStatus::ReviewRequired => 0,
-                argus_core::VerdictStatus::Halted => 1,
+                apohara_argus_core::VerdictStatus::Approved => 0,
+                apohara_argus_core::VerdictStatus::ReviewRequired => 0,
+                apohara_argus_core::VerdictStatus::Halted => 1,
             };
             ExitCode::from(exit as u8)
         }
@@ -223,7 +223,7 @@ async fn main() -> ExitCode {
             }
         }
         Cmd::Prompts => {
-            let lib = argus_core::PromptLibrary::load_embedded().expect("load");
+            let lib = apohara_argus_core::PromptLibrary::load_embedded().expect("load");
             eprintln!("ARGUS Prompt Library — 4 interconnected prompts:\n");
             for name in lib.list() {
                 if let Some(p) = lib.get(name) {
@@ -243,7 +243,7 @@ async fn main() -> ExitCode {
             // feedback on the configured audit retention window. Print
             // before the NIM round-trip so the line is visible even if the
             // network call hangs or fails.
-            let config = argus_core::config::Config::from_env()
+            let config = apohara_argus_core::config::Config::from_env()
                 .expect("config: from_env only fails on dotenv I/O, never on defaults");
             eprintln!("{}", format_retention_line(config.retention_days));
             let client = argus_llm::NimClient::new();

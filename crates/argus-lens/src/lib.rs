@@ -5,7 +5,7 @@
 //! - A Markdown summary (saved to docs/briefings/)
 //! - A JSON file with the structured briefing (saved to the ledger)
 
-use argus_core::{OffenderSummary, OrgSummary, TeamSummary, WeeklyBriefing};
+use apohara_argus_core::{OffenderSummary, OrgSummary, TeamSummary, WeeklyBriefing};
 use argus_github::GitHubClient;
 use argus_llm::{LlmClient, NimClient};
 use chrono::{Duration, NaiveDate, Utc};

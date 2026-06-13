@@ -10,7 +10,7 @@
 //! If a GitHub token is configured, the worker will also post a comment
 //! and set a label on the PR.
 
-use argus_core::{
+use apohara_argus_core::{
     ArgusError, DataClass, DecisionArtifact, FixPlan, PRReview, RiskScore, Verdict, VerdictStatus,
 };
 use argus_crypto::chain::append;
@@ -61,7 +61,7 @@ pub struct AnalyzeResponse {
     pub labels_set: bool,
     /// Structured handoff for downstream coding agents (Claude Code /
     /// Codex / Cursor / Devin). Sorted high-severity first. See
-    /// `argus_core::FixPlan` for the JSON shape. [Refs: 1.2]
+    /// `apohara_argus_core::FixPlan` for the JSON shape. [Refs: 1.2]
     pub fix_plan: FixPlan,
 }
 
@@ -209,8 +209,8 @@ impl VerifyWorker {
             pr_commit_hash: pr_commit,
             verdict: out.verdict.clone(),
             findings: vec![], // simplified for now
-            agent_chain: vec![argus_core::AgentAction {
-                agent: argus_core::AgentRole::AegisVerdict,
+            agent_chain: vec![apohara_argus_core::AgentAction {
+                agent: apohara_argus_core::AgentRole::AegisVerdict,
                 spiffe_id: agent.spiffe_id.as_str().to_string(),
                 action: "VERDICT_EMITTED".to_string(),
                 timestamp: Utc::now(),

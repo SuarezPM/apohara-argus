@@ -29,7 +29,7 @@ the hosted surface and the support layer.
 - The **four specialists**: `aegis_slop` (deterministic slop detector),
   `aegis_security` (red-team review), `aegis_arch` (architecture fit),
   `aegis_verdict` (verdict synthesizer with CordonEnforcer isolation).
-- The **MCP server** (`argus-mcp`) that exposes the four specialists to
+- The **MCP server** (`apohara-argus-mcp`) that exposes the four specialists to
   Claude Code, Codex, and Cursor over stdio JSON-RPC.
 - The **audit chain**: 15-field `AuditEvent`, BLAKE3 hash chained,
   Ed25519 signed, EU AI Act Article 12 Level 2 conformant by default.

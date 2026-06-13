@@ -29,7 +29,7 @@
 | # | Item | Why deferred | Effort |
 |---|------|--------------|--------|
 | 4 | EU AI Act Level 2 conformance | Marketing push AFTER Aug 2; current Art. 12 cover is already strong (L1) | ~20h |
-| 5 | MCP server | Needs user demand; would be a new `argus-mcp` workspace member | ~24h |
+| 5 | MCP server | Needs user demand; would be a new `apohara-argus-mcp` workspace member | ~24h |
 | 7.2 | BYVK opt-in (HeyGen/D-ID video) | User hasn't asked for video avatar; deeplink (7.1) gives 80% value | ~8h |
 
 ## Verification (Wave 7 ✅)

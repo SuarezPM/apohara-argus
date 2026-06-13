@@ -14,7 +14,7 @@ ARGUS es una **capa de accountability para código AI-generated** construida en 
 
 ```
 crates/
-├── argus-core         Tipos, errores, 4 prompts documentados (.md), config
+├── apohara-argus-core         Tipos, errores, 4 prompts documentados (.md), config
 ├── argus-crypto       ed25519 (firma), BLAKE3 (hash chain), SPIFFE-like IDs
 ├── argus-llm          Cliente LLM unificado (NIM primario, OpenAI-compatible)
 ├── argus-slop         4 analyzers (slop/security/arch/verdict) en pipeline paralelo
@@ -24,7 +24,7 @@ crates/
 ├── argus-lens         Weekly digest (Aegis Lens: "CTO avatar script")
 ├── argus-agent        El agente como código: AgentSpec, DecisionLog, Orchestrator, CordonEnforcer
 ├── argus-dashboard    SSR UI con Axum + htmx + Tailwind CDN
-└── argus-cli          CLI unificado: argus health/prompts/guard/verify/lens
+└── apohara-argus-cli          CLI unificado: argus health/prompts/guard/verify/lens
 ```
 
 ### Decisiones de stack ya tomadas
@@ -41,7 +41,7 @@ crates/
 
 ### Lo que YA funciona (verificado end-to-end con NIM real)
 
-- Cliente NIM conecta, 4 prompts cargan desde `argus-core::prompts/`
+- Cliente NIM conecta, 4 prompts cargan desde `apohara-argus-core::prompts/`
 - Pipeline E2E detecta AWS keys como CRITICAL, emite verdict
 - Lens genera weekly briefing con script del "CTO avatar"
 - CLI unificado funciona: `argus health/prompts/guard/lens` todos OK

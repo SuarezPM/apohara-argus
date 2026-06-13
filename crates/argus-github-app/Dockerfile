@@ -53,7 +53,7 @@ COPY Cargo.toml Cargo.lock ./
 # then delete the stubs once `cargo build` has produced the
 # dependency graph in the target dir.
 COPY crates/argus-github-app/Cargo.toml crates/argus-github-app/Cargo.toml
-COPY crates/argus-core/Cargo.toml crates/argus-core/Cargo.toml
+COPY crates/apohara-argus-core/Cargo.toml crates/apohara-argus-core/Cargo.toml
 COPY crates/argus-crypto/Cargo.toml crates/argus-crypto/Cargo.toml
 COPY crates/argus-llm/Cargo.toml crates/argus-llm/Cargo.toml
 COPY crates/argus-slop/Cargo.toml crates/argus-slop/Cargo.toml
@@ -63,9 +63,9 @@ COPY crates/argus-verify/Cargo.toml crates/argus-verify/Cargo.toml
 COPY crates/argus-lens/Cargo.toml crates/argus-lens/Cargo.toml
 COPY crates/argus-agent/Cargo.toml crates/argus-agent/Cargo.toml
 COPY crates/argus-dashboard/Cargo.toml crates/argus-dashboard/Cargo.toml
-COPY crates/argus-cli/Cargo.toml crates/argus-cli/Cargo.toml
+COPY crates/apohara-argus-cli/Cargo.toml crates/apohara-argus-cli/Cargo.toml
 COPY crates/argus-otel/Cargo.toml crates/argus-otel/Cargo.toml
-COPY crates/argus-mcp/Cargo.toml crates/argus-mcp/Cargo.toml
+COPY crates/apohara-argus-mcp/Cargo.toml crates/apohara-argus-mcp/Cargo.toml
 COPY crates/argus-benchmarks/Cargo.toml crates/argus-benchmarks/Cargo.toml
 
 # Stub the source trees so the workspace compiles, then
@@ -73,17 +73,17 @@ COPY crates/argus-benchmarks/Cargo.toml crates/argus-benchmarks/Cargo.toml
 # in the next step.
 RUN mkdir -p crates/argus-github-app/src && \
     echo 'fn main() {}' > crates/argus-github-app/src/main.rs && \
-    mkdir -p crates/argus-core/src crates/argus-crypto/src \
+    mkdir -p crates/apohara-argus-core/src crates/argus-crypto/src \
         crates/argus-llm/src crates/argus-slop/src \
         crates/argus-github/src crates/argus-guard/src \
         crates/argus-verify/src crates/argus-lens/src \
         crates/argus-agent/src crates/argus-dashboard/src \
-        crates/argus-cli/src crates/argus-otel/src \
-        crates/argus-mcp/src crates/argus-benchmarks/src && \
-    for c in argus-core argus-crypto argus-llm argus-slop \
+        crates/apohara-argus-cli/src crates/argus-otel/src \
+        crates/apohara-argus-mcp/src crates/argus-benchmarks/src && \
+    for c in apohara-argus-core argus-crypto argus-llm argus-slop \
              argus-github argus-guard argus-verify argus-lens \
-             argus-agent argus-dashboard argus-cli argus-otel \
-             argus-mcp argus-benchmarks; do \
+             argus-agent argus-dashboard apohara-argus-cli argus-otel \
+             apohara-argus-mcp argus-benchmarks; do \
         echo '// stub' > crates/$c/src/lib.rs; \
     done && \
     cargo build --release --bin argus-github-app 2>&1 | tail -5 && \
@@ -91,7 +91,7 @@ RUN mkdir -p crates/argus-github-app/src && \
 
 # Now copy the real sources. This invalidates the build
 # cache only on source changes.
-COPY crates/argus-core/src crates/argus-core/src
+COPY crates/apohara-argus-core/src crates/apohara-argus-core/src
 COPY crates/argus-crypto/src crates/argus-crypto/src
 COPY crates/argus-llm/src crates/argus-llm/src
 COPY crates/argus-slop/src crates/argus-slop/src
@@ -101,9 +101,9 @@ COPY crates/argus-verify/src crates/argus-verify/src
 COPY crates/argus-lens/src crates/argus-lens/src
 COPY crates/argus-agent/src crates/argus-agent/src
 COPY crates/argus-dashboard/src crates/argus-dashboard/src
-COPY crates/argus-cli/src crates/argus-cli/src
+COPY crates/apohara-argus-cli/src crates/apohara-argus-cli/src
 COPY crates/argus-otel/src crates/argus-otel/src
-COPY crates/argus-mcp/src crates/argus-mcp/src
+COPY crates/apohara-argus-mcp/src crates/apohara-argus-mcp/src
 COPY crates/argus-benchmarks/src crates/argus-benchmarks/src
 COPY crates/argus-github-app/src crates/argus-github-app/src
 COPY crates/argus-slop/tests crates/argus-slop/tests

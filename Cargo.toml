@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-  "crates/argus-core",
+  "crates/apohara-argus-core",
   "crates/argus-crypto",
   "crates/argus-llm",
   "crates/argus-slop",
@@ -11,9 +11,9 @@ members = [
   "crates/argus-lens",
   "crates/argus-agent",
   "crates/argus-dashboard",
-  "crates/argus-cli",
+  "crates/apohara-argus-cli",
   "crates/argus-otel",
-  "crates/argus-mcp",
+  "crates/apohara-argus-mcp",
   "crates/argus-benchmarks",
   "crates/argus-github-app",
 ]
@@ -27,7 +27,7 @@ authors = ["Apohara <apohara.dev>"]
 description = "AI slop defense layer for code review (PR review, pre-commit guard, MCP server, audit chain)"
 repository = "https://github.com/SuarezPM/apohara-argus"
 homepage = "https://github.com/SuarezPM/apohara-argus"
-documentation = "https://docs.rs/argus-cli"
+documentation = "https://docs.rs/apohara-argus-cli"
 readme = "README.md"
 keywords = ["ai", "code-review", "mcp", "eu-ai-act", "byok", "rust"]
 categories = ["command-line-utilities", "development-tools::cargo-plugins", "api-bindings"]
@@ -125,7 +125,7 @@ plotters = "0.3"
 # Internal crate deps (version required for cargo publish even though these
 # crates are publish=false; the path is for workspace development, the
 # version is what cargo records in the published tarball's Cargo.toml)
-argus-core      = { version = "0.1.0", path = "crates/argus-core" }
+apohara-argus-core = { version = "0.1.0", path = "crates/apohara-argus-core" }
 argus-crypto    = { version = "0.1.0", path = "crates/argus-crypto" }
 argus-llm       = { version = "0.1.0", path = "crates/argus-llm" }
 argus-slop      = { version = "0.1.0", path = "crates/argus-slop" }
@@ -135,9 +135,9 @@ argus-verify    = { version = "0.1.0", path = "crates/argus-verify" }
 argus-lens      = { version = "0.1.0", path = "crates/argus-lens" }
 argus-agent     = { version = "0.1.0", path = "crates/argus-agent" }
 argus-dashboard = { version = "0.1.0", path = "crates/argus-dashboard" }
-argus-cli       = { version = "0.1.0", path = "crates/argus-cli" }
+apohara-argus-cli       = { version = "0.1.0", path = "crates/apohara-argus-cli" }
 argus-otel      = { version = "0.1.0", path = "crates/argus-otel" }
-argus-mcp       = { version = "0.1.0", path = "crates/argus-mcp" }
+apohara-argus-mcp       = { version = "0.1.0", path = "crates/apohara-argus-mcp" }
 argus-benchmarks = { path = "crates/argus-benchmarks" }
 argus-github-app = { path = "crates/argus-github-app" }
 

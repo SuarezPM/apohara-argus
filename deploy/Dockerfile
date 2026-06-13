@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/li
 
 # Cache deps
 COPY Cargo.toml Cargo.lock* ./
-COPY crates/argus-core/Cargo.toml crates/argus-core/Cargo.toml
+COPY crates/apohara-argus-core/Cargo.toml crates/apohara-argus-core/Cargo.toml
 COPY crates/argus-crypto/Cargo.toml crates/argus-crypto/Cargo.toml
 COPY crates/argus-llm/Cargo.toml crates/argus-llm/Cargo.toml
 COPY crates/argus-slop/Cargo.toml crates/argus-slop/Cargo.toml
@@ -20,21 +20,24 @@ COPY crates/argus-lens/Cargo.toml crates/argus-lens/Cargo.toml
 COPY crates/argus-agent/Cargo.toml crates/argus-agent/Cargo.toml
 COPY crates/argus-api/Cargo.toml crates/argus-api/Cargo.toml
 COPY crates/argus-dashboard/Cargo.toml crates/argus-dashboard/Cargo.toml
-COPY crates/argus-cli/Cargo.toml crates/argus-cli/Cargo.toml
+COPY crates/apohara-argus-cli/Cargo.toml crates/apohara-argus-cli/Cargo.toml
 
 # Create dummy sources so cargo can resolve
-RUN mkdir -p crates/argus-{core,crypto,llm,slop,github,guard,verify,lens,agent,api,dashboard,cli}/src && \
-    echo 'pub fn _dummy() {}' > crates/argus-core/src/lib.rs && \
-    for c in crypto llm slop github guard verify lens agent api dashboard cli; do \
+RUN mkdir -p crates/{apohara-argus-core,argus-crypto,argus-llm,argus-slop,argus-github,argus-guard,argus-verify,argus-lens,argus-agent,argus-api,argus-dashboard,apohara-argus-cli}/src && \
+    echo 'pub fn _dummy() {}' > crates/apohara-argus-core/src/lib.rs && \
+    for c in crypto llm slop github guard verify lens agent api dashboard; do \
         echo 'pub fn _dummy() {}' > crates/argus-$c/src/lib.rs; done && \
-    for c in guard verify lens dashboard cli; do \
-        echo 'fn main() {}' > crates/argus-$c/src/main.rs; done
+    echo 'pub fn _dummy() {}' > crates/apohara-argus-cli/src/lib.rs && \
+    for c in guard verify lens dashboard; do \
+        echo 'fn main() {}' > crates/argus-$c/src/main.rs; done && \
+    echo 'fn main() {}' > crates/apohara-argus-cli/src/main.rs
 RUN cargo build --release --bin argus 2>&1 | tail -5
 
 # Now copy the real sources
 COPY crates/ crates/
-RUN touch crates/argus-{core,crypto,llm,slop,github,guard,verify,lens,agent,api,dashboard,cli}/src/lib.rs && \
-    for c in guard verify lens dashboard cli; do touch crates/argus-$c/src/main.rs; done
+RUN touch crates/{apohara-argus-core,argus-crypto,argus-llm,argus-slop,argus-github,argus-guard,argus-verify,argus-lens,argus-agent,argus-api,argus-dashboard,apohara-argus-cli}/src/lib.rs && \
+    for c in guard verify lens dashboard; do touch crates/argus-$c/src/main.rs; done && \
+    touch crates/apohara-argus-cli/src/main.rs
 RUN cargo build --release --bin argus --bin argus-verify --bin argus-dashboard --bin argus-lens --bin argus-guard
 
 # Stage 2: minimal runtime image

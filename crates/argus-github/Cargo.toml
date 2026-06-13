@@ -7,12 +7,12 @@ authors.workspace = true
 description = "ARGUS crate: argus-github — GitHub PR fetching + comment posting"
 repository.workspace = true
 # Internal library — not published to crates.io. The GitHub API client
-# is a private adapter; consumers use the `argus-verify` / `argus-cli`
+# is a private adapter; consumers use the `argus-verify` / `apohara-argus-cli`
 # public surfaces that orchestrate the PR review workflow.
 publish = false
 
 [dependencies]
-argus-core = { workspace = true }
+apohara-argus-core = { workspace = true }
 argus-crypto = { workspace = true }
 reqwest = { workspace = true, features = ["json", "rustls-tls"] }
 serde = { workspace = true }

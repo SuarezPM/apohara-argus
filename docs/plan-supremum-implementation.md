@@ -12,7 +12,7 @@
 | 1 | `argus-crypto/src/ledger.rs` | File is `chain.rs` (pure functions, no store) | Item 2.1/2.2 edit `chain.rs`; persistent store is net-new |
 | 2 | `argus-llm/src/client.rs` | Files are `nim.rs` + `openai_compat.rs` + `mock.rs` | Item 3.1 wraps existing NimClient, no `client.rs` |
 | 3 | `argus-verify/src/{routes,handler,cache}.rs` | Only `main.rs` + `lib.rs` (monolithic) | Items 2.2/6.2 create new modules or extend monolith (D1.C) |
-| 4 | `argus-cli/src/commands/health.rs` | No `commands/`; Health inline at main.rs:62-214 | Item 2.4 extends inline |
+| 4 | `apohara-argus-cli/src/commands/health.rs` | No `commands/`; Health inline at main.rs:62-214 | Item 2.4 extends inline |
 | 5 | `argus-dashboard/{templates,static}/` | None; HTML is inline format! strings | Item 1.1 extracts to `templates.rs` module (D2.A) |
 | 6 | `AuditEvent`/`DecisionArtifact` exist | **Neither exists** — roadmap-only spec | Item 2.1 creates both in core/src/types.rs |
 | 7 | Integration tests `#[ignore]`'d | `tests/` is empty; 0 `#[ignore]`'d tests | TDD = new unit + integration tests |
@@ -39,9 +39,9 @@ Wave 7 (1d): Final verification (test+clippy+release+review)
 
 | Item | Category | Skills | Files | TDD | Commit |
 |------|----------|--------|-------|-----|--------|
-| 4.1 Model swap | quick | - | `argus-llm/src/{model_registry.rs(NEW),nim.rs}`, `argus-core/src/config.rs`, `argus-verify/src/lib.rs`, `.env.example` | 3+ tests: happy/edge/regression | `feat(llm): per-role model registry [Refs: 4.1]` |
+| 4.1 Model swap | quick | - | `argus-llm/src/{model_registry.rs(NEW),nim.rs}`, `apohara-argus-core/src/config.rs`, `argus-verify/src/lib.rs`, `.env.example` | 3+ tests: happy/edge/regression | `feat(llm): per-role model registry [Refs: 4.1]` |
 | 6.1 Graceful shutdown | quick | - | `argus-verify/src/main.rs`, `argus-dashboard/src/main.rs` | 3+ tests: SIGTERM drains/SIGINT drain/regression | `feat(verify,dashboard): graceful shutdown [Refs: 6.1]` |
-| 2.1 AuditEvent | unspecified-high | - | `argus-core/src/{types.rs,config.rs}`, `argus-llm/src/{audit.rs(NEW),lib.rs}`, `argus-verify/src/lib.rs` | 4+ tests: roundtrip/fingerprint/chain/schema | `feat(core,llm): AuditEvent Art.12 [Refs: 2.1]` |
+| 2.1 AuditEvent | unspecified-high | - | `apohara-argus-core/src/{types.rs,config.rs}`, `argus-llm/src/{audit.rs(NEW),lib.rs}`, `argus-verify/src/lib.rs` | 4+ tests: roundtrip/fingerprint/chain/schema | `feat(core,llm): AuditEvent Art.12 [Refs: 2.1]` |
 | 3.1 Circuit breaker | ultrabrain | debugging | `argus-llm/src/{circuit_breaker.rs(NEW),retry.rs(NEW)}`, `openai_compat.rs`, workspace deps | 4+ tests: state cycle/open-no-call/concurrency | `feat(llm): circuit breaker [Refs: 3.1]` |
 
 ## Risk Register (top 5)

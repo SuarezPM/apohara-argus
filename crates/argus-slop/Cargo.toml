@@ -12,7 +12,7 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-argus-core = { workspace = true }
+apohara-argus-core = { workspace = true }
 argus-llm = { workspace = true }
 argus-crypto = { workspace = true }
 async-trait = { workspace = true }

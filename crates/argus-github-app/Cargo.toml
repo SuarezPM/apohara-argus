@@ -20,7 +20,7 @@ path = "src/main.rs"
 # Workspace internals — the App reuses the same verification
 # pipeline (argus-verify::VerifyWorker) and the same GitHub
 # client (post_comment, set_labels) that the CLI uses.
-argus-core = { workspace = true }
+apohara-argus-core = { workspace = true }
 argus-verify = { workspace = true }
 argus-github = { workspace = true }
 argus-slop = { workspace = true }

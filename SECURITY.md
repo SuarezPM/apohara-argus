@@ -20,7 +20,7 @@ What counts as a vulnerability worth reporting through this channel:
   (SLOP-001..005) on a benign input the corpus claims is caught.
 - A **slop-detector false positive** on a known-good Rust idiom the test
   corpus claims is allowed.
-- A **LLM-prompt-injection sink** in `argus-llm` or `argus-mcp` where crafted
+- A **LLM-prompt-injection sink** in `argus-llm` or `apohara-argus-mcp` where crafted
   code or comments cause the semantic layer to exfiltrate, mis-classify, or
   ignore its system prompt.
 - An **audit-chain break** in `argus-crypto` where the BLAKE3 hash chain or
@@ -42,7 +42,7 @@ maintainer privately through their [GitHub
 profile](https://github.com/SuarezPM).
 
 What to include: a minimal reproduction (the exact diff / config / command),
-the ARGUS version (`argus-cli --version` or the relevant crate's
+the ARGUS version (`apohara-argus-cli --version` or the relevant crate's
 `Cargo.toml` version), the OS + Rust toolchain version, and what you expected
 vs. what happened.
 
@@ -141,7 +141,7 @@ call, the specialist returns a structured error rather than crashing.
 
 - **Semantic slop / security / architecture findings** the deterministic
   layer cannot reach. The 4 specialist prompts live in
-  `crates/argus-core/prompts/` and are version-pinned.
+  `crates/apohara-argus-core/prompts/` and are version-pinned.
 - **Per-specialist latency budgets** so a slow LLM call cannot stall the
   whole PR review (Tokio `join!` + a wall-clock ceiling per specialist).
 - **Fail-soft on NIM errors.** A 5xx, a network timeout, or a malformed
@@ -196,7 +196,7 @@ prompt-injected through.
   regulator-facing traceability. The chain is tamper-evident, not
   confidential — see §6.
 
-### 4. MCP server surface (`crates/argus-mcp`)
+### 4. MCP server surface (`crates/apohara-argus-mcp`)
 
 The 4 specialists are also exposed as MCP tools (`aegis_slop`,
 `aegis_security`, `aegis_arch`, `aegis_verdict`) over a short-lived stdio

@@ -18,7 +18,7 @@ the **Passing** badge first.
 
 ## Coverage figure
 
-> **Coverage pending; estimated ≥80% on the core crates** (`argus-core`,
+> **Coverage pending; estimated ≥80% on the core crates** (`apohara-argus-core`,
 > `argus-crypto`, `argus-slop`, `argus-llm`). The deterministic layer
 > (`argus-slop`) is well-covered by its `lib.rs` unit suite and the
 > deterministic pipeline path; the HTTP surface (`argus-verify`) and the
@@ -43,11 +43,11 @@ the **Passing** badge first.
 > `CLAUDE.md` § *Files that are load-bearing*). The 4 specialists are
 > also exposed as **MCP tools** (`aegis_slop`, `aegis_security`,
 > `aegis_arch`, `aegis_verdict`) over a short-lived stdio JSON-RPC process,
-> callable from Claude Code / Codex / Cursor (`crates/argus-mcp`,
+> callable from Claude Code / Codex / Cursor (`crates/apohara-argus-mcp`,
 > `CHANGELOG.md:49-58`). The **open-core model** keeps the 7 public crates
-> (`argus-cli`, `argus-guard`, `argus-verify`, `argus-lens`,
-> `argus-dashboard`, `argus-llm`, `argus-mcp`) on crates.io / npm and the
-> 6 internal crates (`argus-core`, `argus-crypto`, `argus-slop`,
+> (`apohara-argus-cli`, `argus-guard`, `argus-verify`, `argus-lens`,
+> `argus-dashboard`, `argus-llm`, `apohara-argus-mcp`) on crates.io / npm and the
+> 6 internal crates (`apohara-argus-core`, `argus-crypto`, `argus-slop`,
 > `argus-github`, `argus-agent`, `argus-otel`) marked `publish = false`
 > (per `CHANGELOG.md:131-138`). These properties map directly to specific
 > criteria below: `signed_releases` reaches **SLSA Build L3** (one rung
@@ -74,7 +74,7 @@ the rest):
 | `floss_license` | Met | MIT, see `LICENSE` (top-level, 21 lines) and `Cargo.toml:23` (`license = "MIT"`). |
 | `license_location` | Met | Top-level `LICENSE` is the path the BadgeApp scanner recognizes; also mirrored in every crate's `Cargo.toml` via the workspace `license` field. |
 | `documentation_basics` | Met | `README.md` (full landing-page structure with Quick Start, Architecture, Features, Comparison). |
-| `documentation_interface` | Met | `README.md:199-227` (Quickstart) + the subcommand reference for `argus-guard` / `argus-verify` / `argus-lens` / `argus-dashboard` / `argus-mcp`. |
+| `documentation_interface` | Met | `README.md:199-227` (Quickstart) + the subcommand reference for `argus-guard` / `argus-verify` / `argus-lens` / `argus-dashboard` / `apohara-argus-mcp`. |
 | `repo_public` | Met | `github.com/SuarezPM/apohara-argus` (per `Cargo.toml:26` and `README.md:200`). |
 | `repo_track` | Met | Standard `git`; full history visible in `git log` (23+ commits, conventional-commits style). |
 | `repo_distributed` | Met | Public Git on GitHub; standard clone + push. |
@@ -103,7 +103,7 @@ the rest):
 | `crypto_verification_private` | Met | Certificate verification happens before any byte of a TLS response is read; no insecure / `danger_accept_invalid_certs` path. |
 | `crypto_weaknesses` | Met | The only hash functions in use are **BLAKE3** (`blake3 = "1"`, `Cargo.toml:65`) and **Ed25519** (`ed25519-dalek = { version = "2" }`, `Cargo.toml:64`). No MD5, no SHA-1. |
 | `release_notes` | Met | `CHANGELOG.md` (Keep a Changelog format per `CHANGELOG.md:3-8`). |
-| `installation_common` | Met | After **B.4** lands, `cargo install apohara-argus`; `argus-guard` / `argus-verify` / `argus-mcp` installable from the same `cargo install` once the 7 public crates are on crates.io (the publish pipeline is `publish.yml`, currently `workflow_dispatch`-only). The README's quick start (`README.md:199-222`) already shows the direct `cargo run -p …` install path. |
+| `installation_common` | Met | After **B.4** lands, `cargo install apohara-argus`; `argus-guard` / `argus-verify` / `apohara-argus-mcp` installable from the same `cargo install` once the 7 public crates are on crates.io (the publish pipeline is `publish.yml`, currently `workflow_dispatch`-only). The README's quick start (`README.md:199-222`) already shows the direct `cargo run -p …` install path. |
 
 | Criterion | Status | Evidence |
 |---|---|---|

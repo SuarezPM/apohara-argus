@@ -189,7 +189,7 @@ Opt-in via `ARGUS_A2A_DISABLED=false`. Google A2A orchestrators can discover and
 
         External:
         ───────
-        MCP server (argus-mcp) ──► Claude Code / Codex / Cursor
+        MCP server (apohara-argus-mcp) ──► Claude Code / Codex / Cursor
         A2A AgentCards         ──► Google A2A orchestrators
 ```
 
@@ -208,19 +208,19 @@ export ARGUS_NIM_KEY=nvapi-xxx
 cargo build --release
 
 # 3. Pre-commit guard on a local diff
-echo "+ user.password = 'hunter2'" | cargo run -p argus-cli -- guard --diff -
+echo "+ user.password = 'hunter2'" | cargo run -p apohara-argus-cli -- guard --diff -
 
 # 4. PR review (one-shot, with the 4 specialists)
-cargo run -p argus-cli -- verify --pr-url https://github.com/owner/repo/pull/42
+cargo run -p apohara-argus-cli -- verify --pr-url https://github.com/owner/repo/pull/42
 
 # 5. Weekly digest for an org
-cargo run -p argus-cli -- lens --org acme --mock-prs "acme/api#1,acme/web#2"
+cargo run -p apohara-argus-cli -- lens --org acme --mock-prs "acme/api#1,acme/web#2"
 
 # 6. Start the dashboard (SSR, port 3000)
 cargo run -p argus-dashboard
 
 # 7. Start the MCP server (for Claude Code / Codex)
-cargo run -p argus-mcp
+cargo run -p apohara-argus-mcp
 
 # 8. Verify EU AI Act compliance (BLAKE3 chain + manifest)
 curl http://localhost:8080/audit/export?from=2026-01-01 | tail -1
@@ -250,7 +250,7 @@ curl http://localhost:8080/audit/export?from=2026-01-01 | tail -1
 | 6.3 | OpenTelemetry stdout | `argus-otel` crate, env-gated | Observability when you want it |
 | 6.4 | SQLite audit persistence | sqlx 0.7 + sqlite | Survives process restarts |
 | 4 | EU AI Act L2 conformance | `data_class` + `policy_version` fields | Level 2 spec-conformant |
-| 5 | **MCP server** | `argus-mcp` crate, 4 tools | Claude Code / Codex / Cursor integration |
+| 5 | **MCP server** | `apohara-argus-mcp` crate, 4 tools | Claude Code / Codex / Cursor integration |
 | 3.2 | A2A AgentCards | (same as above) | (cross-listed) |
 
 **Deliberately not done:** `7.2 BYVK opt-in` (HeyGen/D-ID video integration) — supremum-roadmap said "Do NOT integrate" because the $78-460/yr cost kills the $0.05/dev/month story. 7.1 (deeplink) gives 80% of the value at 0% of the cost.
@@ -307,7 +307,7 @@ ARGUS pays for itself in week 1 of any team > 3 developers:
 git clone https://github.com/SuarezPM/apohara-argus.git
 cd apohara-argus
 export ARGUS_NIM_KEY=nvapi-xxx
-cargo run -p argus-cli -- scan-diff ./your-pr.diff
+cargo run -p apohara-argus-cli -- scan-diff ./your-pr.diff
 ```
 
 License: **MIT**. Self-host, modify, redistribute. No telemetry, no phone-home.

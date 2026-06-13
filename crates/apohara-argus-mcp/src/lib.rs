@@ -17,7 +17,7 @@
 use std::future::Future;
 use std::time::Instant;
 
-use argus_core::Result as ArgusResult;
+use apohara_argus_core::Result as ArgusResult;
 use argus_llm::{LlmClient, NimClient};
 use argus_slop::pipeline::AnalysisPipeline;
 use argus_slop::{Analyzer, ArchitectureFit, SecurityReview, SlopDetector, VerdictSynthesizer};
@@ -33,7 +33,7 @@ use serde::{Deserialize, Serialize};
 pub struct SpecialistReport {
     /// Which specialist produced this report.
     pub specialist: String,
-    /// Prompt name from `argus-core/prompts/`.
+    /// Prompt name from `apohara-argus-core/prompts/`.
     pub prompt_name: String,
     /// Model id used (e.g., "zhipuai/glm-5.1").
     pub model_id: String,
@@ -264,7 +264,7 @@ impl ArgusMcp {
         // Pipeline is tolerant of failures — we still get a verdict.
 
         let verdict_report = pipeline_output.verdict;
-        let fix_plan = argus_core::FixPlan::from_findings(&[]);
+        let fix_plan = apohara_argus_core::FixPlan::from_findings(&[]);
         let mut combined_findings = serde_json::json!({
             "slop": slop_report,
             "security": sec_report,

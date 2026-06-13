@@ -60,7 +60,7 @@ yanked = "warn"
 # rationale; revisit at the next dependency-review wave.
 ignore = [
     # paste 1.0.15 (dtolnay/archived 2024) — pulled in transitively by rmcp
-    # (argus-mcp) and sqlx-core. The crate is archived but functional and the
+    # (apohara-argus-mcp) and sqlx-core. The crate is archived but functional and the
     # macro_rules! expansion is still correct. `pastey` is a viable drop-in
     # replacement, but rmcp 0.5's macros are still written against `paste`.
     "RUSTSEC-2024-0436",

@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use ed25519_dalek::SigningKey;
 use std::sync::{Arc, Mutex};
 
-use argus_core::{DataClass, DecisionArtifact};
+use apohara_argus_core::{DataClass, DecisionArtifact};
 
 use super::audit::{emit_audit_event, next_prev_hash};
 use super::circuit_breaker::{CircuitBreakerConfig, LlmCircuitBreaker};

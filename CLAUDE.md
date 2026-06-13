@@ -10,7 +10,7 @@ layer for AI-generated code). A **hybrid (deterministic regex + LLM
 semantic) defense layer** packaged as a **14-crate Rust workspace**.
 Three runtime surfaces (`argus-guard` pre-commit, `argus-verify` PR
 review HTTP, `argus-lens` weekly digest) plus a **MCP server**
-(`argus-mcp`) that exposes the 4 specialists (`aegis_slop`,
+(`apohara-argus-mcp`) that exposes the 4 specialists (`aegis_slop`,
 `aegis_security`, `aegis_arch`, `aegis_verdict`) to Claude Code /
 Codex / Cursor.
 
@@ -24,8 +24,8 @@ BYOK for the LLM layer (NVIDIA NIM via `ARGUS_NIM_KEY` env var).
 | File | Why it matters |
 |------|----------------|
 | `Cargo.toml` | Workspace root, `license = "MIT"`, `version = "0.1.0"`, `rust-version = "1.88"`, members list. Touching the `members` list without a re-pin is a build break. |
-| `crates/argus-core/src/types.rs` | The 15-field `AuditEvent`, the `DataClass` enum, the `policy_version` constant. Bumping `policy_version` is a breaking change for the audit chain. |
-| `crates/argus-core/prompts/` | The 4 specialist prompts (`slop-detector`, `redteam-security`, `architecture-fit`, `verdict-synthesizer`). Adding a new prompt is a breaking change. |
+| `crates/apohara-argus-core/src/types.rs` | The 15-field `AuditEvent`, the `DataClass` enum, the `policy_version` constant. Bumping `policy_version` is a breaking change for the audit chain. |
+| `crates/apohara-argus-core/prompts/` | The 4 specialist prompts (`slop-detector`, `redteam-security`, `architecture-fit`, `verdict-synthesizer`). Adding a new prompt is a breaking change. |
 | `crates/argus-crypto/` | BLAKE3 chaining + Ed25519 signing. **Do not weaken** the chain or skip the signature step. |
 | `crates/argus-slop/src/rules/` | The SLOP-001..005 regex rules. **Required** positive + negative fixtures in the corpus. |
 | `crates/argus-slop/tests/benchmark.rs` | The 0-FP / 0-FN gate. The benchmark is the contract. |
@@ -126,7 +126,7 @@ honesty net in the same change:
   reality.
 - If you change the audit schema, update `CHANGELOG.md` and
   bump `policy_version` in
-  `crates/argus-core/src/types.rs`.
+  `crates/apohara-argus-core/src/types.rs`.
 
 No claim ships that a test cannot back.
 
@@ -163,7 +163,7 @@ No claim ships that a test cannot back.
   "1.88"`, `license = "MIT"`.
 - **Three runtime surfaces**: `argus-guard`, `argus-verify`,
   `argus-lens` (all 3 in v0.1).
-- **MCP surface**: `argus-mcp` (v0.1, 4 specialists).
+- **MCP surface**: `apohara-argus-mcp` (v0.1, 4 specialists).
 - **Audit chain**: BLAKE3 + Ed25519, 15-field `AuditEvent`,
   EU AI Act Art. 12 Level 2 conformant.
 - **Test count**: 145+ (per README badge), with a committed

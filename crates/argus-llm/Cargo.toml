@@ -16,7 +16,7 @@ include = ["src/**/*.rs", "Cargo.toml", "README.md", "LICENSE"]
 publish = true
 
 [dependencies]
-argus-core = { workspace = true }
+apohara-argus-core = { workspace = true }
 argus-crypto = { workspace = true }
 async-trait = { workspace = true }
 reqwest = { workspace = true }

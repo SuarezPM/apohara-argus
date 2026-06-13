@@ -96,44 +96,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
-name = "argus-agent"
-version = "0.1.0"
-dependencies = [
- "argus-core",
- "argus-crypto",
- "argus-llm",
- "argus-slop",
- "blake3",
- "chrono",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "argus-benchmarks"
-version = "0.1.0"
-dependencies = [
- "argus-core",
- "argus-llm",
- "argus-slop",
- "async-trait",
- "blake3",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "argus-cli"
+name = "apohara-argus-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "argus-core",
+ "apohara-argus-core",
  "argus-crypto",
  "argus-github",
  "argus-guard",
@@ -152,7 +119,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "argus-core"
+name = "apohara-argus-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -169,6 +136,59 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "apohara-argus-mcp"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "apohara-argus-core",
+ "argus-llm",
+ "argus-otel",
+ "argus-slop",
+ "async-trait",
+ "rmcp",
+ "schemars",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "argus-agent"
+version = "0.1.0"
+dependencies = [
+ "apohara-argus-core",
+ "argus-crypto",
+ "argus-llm",
+ "argus-slop",
+ "blake3",
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "argus-benchmarks"
+version = "0.1.0"
+dependencies = [
+ "apohara-argus-core",
+ "argus-llm",
+ "argus-slop",
+ "async-trait",
+ "blake3",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -192,7 +212,7 @@ name = "argus-dashboard"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "argus-core",
+ "apohara-argus-core",
  "argus-crypto",
  "argus-github",
  "argus-lens",
@@ -217,7 +237,7 @@ dependencies = [
 name = "argus-github"
 version = "0.1.0"
 dependencies = [
- "argus-core",
+ "apohara-argus-core",
  "argus-crypto",
  "async-trait",
  "base64 0.22.1",
@@ -235,7 +255,7 @@ name = "argus-github-app"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "argus-core",
+ "apohara-argus-core",
  "argus-github",
  "argus-llm",
  "argus-otel",
@@ -267,7 +287,7 @@ name = "argus-guard"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "argus-core",
+ "apohara-argus-core",
  "argus-crypto",
  "argus-github",
  "argus-llm",
@@ -287,7 +307,7 @@ name = "argus-lens"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "argus-core",
+ "apohara-argus-core",
  "argus-crypto",
  "argus-github",
  "argus-llm",
@@ -306,7 +326,7 @@ dependencies = [
 name = "argus-llm"
 version = "0.1.0"
 dependencies = [
- "argus-core",
+ "apohara-argus-core",
  "argus-crypto",
  "async-trait",
  "blake3",
@@ -321,26 +341,6 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
-]
-
-[[package]]
-name = "argus-mcp"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "argus-core",
- "argus-llm",
- "argus-otel",
- "argus-slop",
- "async-trait",
- "rmcp",
- "schemars",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -359,7 +359,7 @@ dependencies = [
 name = "argus-slop"
 version = "0.1.0"
 dependencies = [
- "argus-core",
+ "apohara-argus-core",
  "argus-crypto",
  "argus-llm",
  "async-trait",
@@ -377,7 +377,7 @@ name = "argus-verify"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "argus-core",
+ "apohara-argus-core",
  "argus-crypto",
  "argus-github",
  "argus-llm",

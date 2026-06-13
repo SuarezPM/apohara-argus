@@ -1,4 +1,4 @@
-//! argus-core — shared types, errors, config, prompt loading
+//! apohara-argus-core — shared types, errors, config, prompt loading
 //!
 //! This crate is the foundation. Every other ARGUS crate depends on it.
 //! It contains:

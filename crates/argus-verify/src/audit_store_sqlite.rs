@@ -10,7 +10,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use argus_core::types::{AuditEvent, Manifest};
+use apohara_argus_core::types::{AuditEvent, Manifest};
 use blake3::Hasher;
 use chrono::{DateTime, Utc};
 use ed25519_dalek::Signature;
@@ -159,7 +159,7 @@ impl SqliteAuditStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use argus_core::{AuditEvent, DataClass, DecisionArtifact};
+    use apohara_argus_core::{AuditEvent, DataClass, DecisionArtifact};
     use chrono::{TimeZone, Utc};
     use ed25519_dalek::{Signer, SigningKey};
     use uuid::Uuid;

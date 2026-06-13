@@ -47,7 +47,7 @@ project adheres to
   reference page.
 - **MCP server exposing 4 specialists** to Claude Code /
   Codex / Cursor (commit `b016e2a`,
-  [`crates/argus-mcp`](crates/argus-mcp), [Refs: 5]): new
+  [`crates/apohara-argus-mcp`](crates/apohara-argus-mcp), [Refs: 5]): new
   crate shipping a stdio JSON-RPC server with 4 tools
   (`aegis_slop`, `aegis_security`, `aegis_arch`,
   `aegis_verdict`) over the rmcp SDK. Per-call NIM key via
@@ -57,7 +57,7 @@ project adheres to
   state, no daemon — short-lived process per MCP client.
 - **EU AI Act Level 2 conformance** — `data_class` and
   `policy_version` on the audit record (commit `a47eabc`,
-  [`crates/argus-core/src/types.rs`](crates/argus-core/src/types.rs),
+  [`crates/apohara-argus-core/src/types.rs`](crates/apohara-argus-core/src/types.rs),
   [Refs: 4]): the `AuditEvent` grows from 13 to 15 fields,
   with the new `DataClass` enum (`None` / `SourceCode` / `Pii`
   / `Phi` / `Contract` / `Mixed` / `Unknown`) and a
@@ -125,17 +125,17 @@ LLM semantic) defense layer for AI-generated code, packaged as a
   Optional SQLite audit persistence (off by default).
   Optional OpenTelemetry stdout exporter (off by default).
   Optional A2A AgentCards (off by default).
-- **MCP integration** ([`crates/argus-mcp`](crates/argus-mcp)):
+- **MCP integration** ([`crates/apohara-argus-mcp`](crates/apohara-argus-mcp)):
   the 4 specialists exposed as MCP tools over stdio
   JSON-RPC, callable from Claude Code / Codex / Cursor.
 - **Workspace scaffolding** (13 of the 14 crates are
   publish-eligible in spirit; the `publish = false` set
-  covers the internal `argus-core` / `argus-crypto` /
+  covers the internal `apohara-argus-core` / `argus-crypto` /
   `argus-slop` / `argus-github` / `argus-agent` /
   `argus-otel` / `argus-benchmarks` crates per the OpenSSF
-  Silver plan; the `publish = true` set is `argus-cli` /
+  Silver plan; the `publish = true` set is `apohara-argus-cli` /
   `argus-guard` / `argus-verify` / `argus-lens` /
-  `argus-dashboard` / `argus-llm` / `argus-mcp`).
+  `argus-dashboard` / `argus-llm` / `apohara-argus-mcp`).
 - **Committed FP / FN precision gate**
   ([`crates/argus-slop/tests/benchmark.rs`](crates/argus-slop/tests/benchmark.rs)):
   asserts `0 / 73` false positives and `0 / 33` false

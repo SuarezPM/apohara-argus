@@ -19,7 +19,7 @@
 //! Every public type is JSON-serializable so the agent's behavior can be
 //! logged, audited, and reproduced.
 
-use argus_core::AgentRole;
+use apohara_argus_core::AgentRole;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -36,7 +36,7 @@ pub struct AgentSpec {
     pub spiffe_id: String,
     /// The role of this agent within the collective.
     pub role: AgentRole,
-    /// The prompt this agent loads from `argus-core::prompts`.
+    /// The prompt this agent loads from `apohara-argus-core::prompts`.
     pub prompt_name: String,
     /// Skills this agent has.
     pub capabilities: Vec<String>,
@@ -481,7 +481,7 @@ impl Orchestrator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use argus_core::{RiskScore, Verdict, VerdictStatus};
+    use apohara_argus_core::{RiskScore, Verdict, VerdictStatus};
 
     #[test]
     fn slop_spec_has_cordon_compatible_constraints() {

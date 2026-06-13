@@ -1,6 +1,6 @@
 //! Argus Prompt Library loader.
 //!
-//! The 4 prompt .md files live in `crates/argus-core/prompts/`. They have
+//! The 4 prompt .md files live in `crates/apohara-argus-core/prompts/`. They have
 //! YAML frontmatter (model, temperature, max_tokens, output_format) and a
 //! Markdown body. This loader reads them at runtime.
 

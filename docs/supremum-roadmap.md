@@ -121,7 +121,7 @@ pub const MODEL_LENS:        &str = "meta/llama-3.1-70b-instruct";   # keep, Len
 
 **Why not my EXA choices:** Nemotron 3 Ultra (550B) and Kimi K2.6 are NGC-enterprise (paid tier). Nemotron 3 Super 120B and deepseek-v4-flash are free tier. GLM-5.1 matches both sources.
 
-**Files:** `crates/argus-core/src/config.rs` (add `ModelRole` enum + defaults), `crates/argus-llm/src/nim.rs` (consume role), `crates/argus-slop/src/pipeline.rs` (pass role to NimClient), `.env.example`
+**Files:** `crates/apohara-argus-core/src/config.rs` (add `ModelRole` enum + defaults), `crates/argus-llm/src/nim.rs` (consume role), `crates/argus-slop/src/pipeline.rs` (pass role to NimClient), `.env.example`
 
 #### 🟥 [6.1] Graceful shutdown in argus-verify + argus-dashboard (2h)
 
@@ -161,7 +161,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 **Resolution:** Combine my EXA spec adoption with Perplexity's 7 required fields:
 
 ```rust
-// crates/argus-core/src/types.rs
+// crates/apohara-argus-core/src/types.rs
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AuditEvent {
     // === Required by Article 12.2 (automatic recording over lifetime) ===
@@ -188,7 +188,7 @@ pub struct AuditEvent {
 }
 ```
 
-**Files:** `crates/argus-core/src/types.rs`, `crates/argus-crypto/src/ledger.rs`, `crates/argus-llm/src/audit.rs`
+**Files:** `crates/apohara-argus-core/src/types.rs`, `crates/argus-crypto/src/ledger.rs`, `crates/argus-llm/src/audit.rs`
 
 #### 🟥 [3.1] LLM circuit breaker + retry (4h)
 
@@ -311,7 +311,7 @@ pub struct AgentClaims {
 #### 🟧 [2.4] Retention policy in `argus health` (1h)
 
 ```rust
-// crates/argus-cli/src/commands/health.rs
+// crates/apohara-argus-cli/src/commands/health.rs
 pub fn print_health() {
     let retention_days = config.retention_days();
     let warning = if retention_days < 180 {
@@ -323,7 +323,7 @@ pub fn print_health() {
 }
 ```
 
-**Files:** `crates/argus-cli/src/commands/health.rs`, `crates/argus-core/src/config.rs`
+**Files:** `crates/apohara-argus-cli/src/commands/health.rs`, `crates/apohara-argus-core/src/config.rs`
 
 ---
 

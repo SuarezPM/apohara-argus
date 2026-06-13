@@ -10,7 +10,7 @@
 //!
 //! See: `docs/supremum-roadmap.md` §2.1 (Article 12 compliance).
 
-use argus_core::{AuditEvent, DataClass, DecisionArtifact, ToolCallRecord};
+use apohara_argus_core::{AuditEvent, DataClass, DecisionArtifact, ToolCallRecord};
 use blake3::Hasher;
 use chrono::Utc;
 use ed25519_dalek::{Signature, Signer, SigningKey};
@@ -129,7 +129,7 @@ fn blake3_bytes(data: &[u8]) -> [u8; 32] {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use argus_core::DecisionArtifact;
+    use apohara_argus_core::DecisionArtifact;
     use ed25519_dalek::Verifier;
     use serde_json::Value;
 

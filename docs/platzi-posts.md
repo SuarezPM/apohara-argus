@@ -36,7 +36,7 @@ max_tokens, output_format esperado) y un cuerpo markdown con instrucciones
 precisas. El equipo puede usarlos directamente en cualquier chat de LLM, o
 el sistema ARGUS los carga automáticamente en su pipeline Rust.
 
-**Link al repo:** https://github.com/SuarezPM/apohara-argus/tree/main/crates/argus-core/prompts
+**Link al repo:** https://github.com/SuarezPM/apohara-argus/tree/main/crates/apohara-argus-core/prompts
 
 **Resultado concreto:** los 4 prompts se cargan y ejecutan en mi pipeline multi-agente
 de revisión de PRs (Proyecto 2 del reto) y detectan AWS keys hardcodeadas,
@@ -205,7 +205,7 @@ qué decidió y por qué.
 
 **¿Qué skills tiene?**
 
-- Cada agente carga su prompt desde `crates/argus-core/prompts/*.md` (4 prompts
+- Cada agente carga su prompt desde `crates/apohara-argus-core/prompts/*.md` (4 prompts
   documentados con frontmatter YAML)
 - Los prompts son model-agnostic (funcionan con cualquier LLM que siga instrucciones)
 - Default: NVIDIA NIM con Llama 3.1 70B. Configurable via `ARGUS_NIM_MODEL`
@@ -332,7 +332,7 @@ porque 19/20 reportes eran alucinaciones de AI. "AI slop" fue la Word of the Yea
 
 **La solución (5 capas en 1 producto):**
 
-1. **Sistema de prompts** — 4 prompts documentados en `crates/argus-core/prompts/`,
+1. **Sistema de prompts** — 4 prompts documentados en `crates/apohara-argus-core/prompts/`,
    cada uno con frontmatter YAML y un cuerpo markdown. Cualquier dev los puede
    copiar a Claude, ChatGPT, o usarlos automáticamente via el loader Rust.
 

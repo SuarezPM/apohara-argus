@@ -20,7 +20,7 @@ name = "argus-lens"
 path = "src/main.rs"
 
 [dependencies]
-argus-core = { workspace = true }
+apohara-argus-core = { workspace = true }
 argus-llm = { workspace = true }
 argus-slop = { workspace = true }
 argus-crypto = { workspace = true }

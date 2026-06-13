@@ -35,7 +35,7 @@ async fn raw_security_call_works() {
         return;
     };
     let client = NimClient::new();
-    let lib = argus_core::PromptLibrary::load_embedded().expect("load");
+    let lib = apohara_argus_core::PromptLibrary::load_embedded().expect("load");
     let prompt = lib.get("redteam-security").expect("prompt");
     let diff = FAKE_SECRET_DIFF;
     let resp = client
@@ -62,7 +62,7 @@ async fn raw_slop_call_works() {
         return;
     };
     let client = NimClient::new();
-    let lib = argus_core::PromptLibrary::load_embedded().expect("load");
+    let lib = apohara_argus_core::PromptLibrary::load_embedded().expect("load");
     let prompt = lib.get("slop-detector").expect("prompt");
     let diff = FAKE_SECRET_DIFF;
     let resp = client

@@ -415,7 +415,7 @@ fn render_landing(briefing_md: &str) -> String {
    [GitHub PR / commit / org scan]    ──►  [MCP client: Claude Code / Codex / Cursor]
               │                                       │
               ▼                                       ▼
-   Aegis Guard ──► Aegis Verify ──► Aegis Lens    argus-mcp
+   Aegis Guard ──► Aegis Verify ──► Aegis Lens    apohara-argus-mcp
      (pre-commit)   (PR review)     (weekly)     (4 specialist tools)
               │          │              │
               └──────────┴──────────────┘
@@ -464,16 +464,16 @@ git clone https://github.com/SuarezPM/apohara-argus
 cd apohara-argus
 
 # 3. Pre-commit guard
-echo "your diff" | cargo run -p argus-cli -- guard --diff -
+echo "your diff" | cargo run -p apohara-argus-cli -- guard --diff -
 
 # 4. PR review (one-shot)
-cargo run -p argus-cli -- verify --pr-url https://github.com/owner/repo/pull/42
+cargo run -p apohara-argus-cli -- verify --pr-url https://github.com/owner/repo/pull/42
 
 # 5. Weekly digest
-cargo run -p argus-cli -- lens --org acme --mock-prs "acme/api#1,acme/web#2"
+cargo run -p apohara-argus-cli -- lens --org acme --mock-prs "acme/api#1,acme/web#2"
 
 # 6. MCP server (Claude Code / Codex)
-cargo run -p argus-mcp
+cargo run -p apohara-argus-mcp
 
 # 7. Verify EU AI Act compliance
 curl http://localhost:8080/audit/export?from=2026-01-01 | tail -1</code></pre>
@@ -487,7 +487,7 @@ curl http://localhost:8080/audit/export?from=2026-01-01 | tail -1</code></pre>
   <h2>5 Platzi projects, one product</h2>
   <p>Built for the <strong>Reto AI Academy</strong> — 5 projects in one unified submission:</p>
   <ol>
-    <li><strong>Sistema de prompts</strong> → 4 documented prompts at <code>crates/argus-core/prompts/</code> + a Rust loader</li>
+    <li><strong>Sistema de prompts</strong> → 4 documented prompts at <code>crates/apohara-argus-core/prompts/</code> + a Rust loader</li>
     <li><strong>Automatización</strong> → 3 Tokio workers: Guard, Verify, Lens, all autonomous</li>
     <li><strong>App web</strong> → SSR dashboard (Axum + htmx, this page)</li>
     <li><strong>Agente</strong> → the workflow as agent (skills, context, decisions) + MCP server</li>

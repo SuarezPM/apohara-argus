@@ -1,7 +1,7 @@
 //! argus-slop — the 4 ARGUS analyzers
 //!
 //! Each analyzer:
-//! 1. Loads a prompt from `argus-core::prompts`
+//! 1. Loads a prompt from `apohara-argus-core::prompts`
 //! 2. Builds a request: (system prompt, diff, optional context)
 //! 3. Calls the LLM via the BYOK key
 //! 4. Parses the JSON response into a structured finding
@@ -26,7 +26,7 @@ pub use security::{SecurityFinding, SecurityReport, SecurityReview};
 pub use slop_detector::{SlopDetector, SlopReport};
 pub use verdict::{SynthesizerInput, VerdictSynthesizer};
 
-use argus_core::{PRFinding, Result as ArgusResult};
+use apohara_argus_core::{PRFinding, Result as ArgusResult};
 use argus_llm::LlmClient;
 use async_trait::async_trait;
 use thiserror::Error;
@@ -47,8 +47,8 @@ impl From<argus_llm::LlmError> for SlopError {
     }
 }
 
-impl From<argus_core::ArgusError> for SlopError {
-    fn from(e: argus_core::ArgusError) -> Self {
+impl From<apohara_argus_core::ArgusError> for SlopError {
+    fn from(e: apohara_argus_core::ArgusError) -> Self {
         Self::Prompt(e.to_string())
     }
 }
@@ -75,7 +75,7 @@ pub trait Analyzer: Send + Sync {
         context: Option<&str>,
         api_key: &str,
     ) -> Result<Self::Output, SlopError> {
-        let lib = argus_core::PromptLibrary::load_embedded()?;
+        let lib = apohara_argus_core::PromptLibrary::load_embedded()?;
         let prompt = lib.get(self.prompt_name()).ok_or_else(|| {
             SlopError::Prompt(format!("prompt '{}' not found", self.prompt_name()))
         })?;

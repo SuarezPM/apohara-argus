@@ -74,13 +74,13 @@ Blocks is a real bug to fix, not a number to relax.
 
 ## Adding an LLM specialist prompt
 
-Specialist prompts live in `crates/argus-core/prompts/`. Adding a
+Specialist prompts live in `crates/apohara-argus-core/prompts/`. Adding a
 new prompt is a **breaking change** for the audit chain
 (`policy_version` is part of the 15-field `AuditEvent`), so:
 
 1. Add the new prompt file with a `version: ` line.
 2. Bump the `policy_version` constant in
-   `crates/argus-core/src/types.rs`.
+   `crates/apohara-argus-core/src/types.rs`.
 3. Wire the new prompt in the specialist that consumes it
    (`SlopDetector`, `SecurityReview`, `ArchitectureFit`, or
    `VerdictSynthesizer`).
