@@ -11,8 +11,8 @@
 use argus_llm::NimClient;
 use argus_verify::VerifyWorker;
 use axum::{
-    extract::{Form, State},
-    http::StatusCode,
+    extract::{Form, Path, State},
+    http::{header, StatusCode},
     response::{Html, IntoResponse},
     routing::{get, post},
     Json, Router,
@@ -23,6 +23,16 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tracing_subscriber::EnvFilter;
 use uuid::Uuid;
+
+mod state;
+mod templates;
+
+use state::{Cohort, DashboardState, Layer};
+
+// The keyboard-nav JS is embedded at compile time so the binary has no
+// runtime dependency on the working directory. This keeps `cargo run` +
+// `curl` working from any cwd.
+const APP_JS: &str = include_str!("../static/app.js");
 
 #[derive(Clone)]
 struct AppState {
@@ -363,6 +373,126 @@ a{color:#06c}.help{color:#888;font-size:13px}</style>
 <p><a href="/">← Home</a></p>
 </body></html>"##;
 
+// =============================================================================
+// Cohort view — the new UX centerpiece (Roadmap 1.1)
+// =============================================================================
+//
+// `/review/:id` renders the four named cohorts that the verify worker
+// produces (slop, security, arch, verdict) as a navigable "Change Stack",
+// inspired by CodeRabbit. Until the audit-store exposes a lookup-by-id API
+// we seed a representative demo state — the structure and the templates
+// are production-ready, the seed data is a placeholder.
+
+/// Demo state for the cohort view. Real reviews will populate this from
+/// `argus_verify::AnalyzeResponse` once we have a `GET /reviews/:id`
+/// endpoint on the verify worker (Roadmap 1.2).
+fn demo_cohort_state(id: &str) -> DashboardState {
+    let mut state = DashboardState::from_review(
+        format!("https://github.com/o/r/pull/{}", id),
+        format!("Demo PR #{}", id),
+    );
+    state.add_cohort(Cohort {
+        id: "slop".into(),
+        name: "Aegis Slop".into(),
+        icon: "S".into(),
+        layers: vec![
+            Layer {
+                id: "slop-1".into(),
+                summary: "Excessive comments mirroring the LLM prompt".into(),
+                file: "src/lib.rs".into(),
+                line_start: 12,
+                line_end: 18,
+                severity: "warning".into(),
+                diff_range: "+// TODO: handle this edge case\n+// NOTE: refactor later".into(),
+            },
+            Layer {
+                id: "slop-2".into(),
+                summary: "Boilerplate doc-comment that adds no signal".into(),
+                file: "src/handler.rs".into(),
+                line_start: 4,
+                line_end: 10,
+                severity: "info".into(),
+                diff_range: "/// This function does X.".into(),
+            },
+        ],
+    });
+    state.add_cohort(Cohort {
+        id: "security".into(),
+        name: "Aegis Security".into(),
+        icon: "X".into(),
+        layers: vec![Layer {
+            id: "sec-1".into(),
+            summary: "String-formatted SQL: potential injection".into(),
+            file: "src/db.rs".into(),
+            line_start: 42,
+            line_end: 48,
+            severity: "critical".into(),
+            diff_range: "-let q = format!(\"SELECT * FROM u WHERE id={}\", id);".into(),
+        }],
+    });
+    state.add_cohort(Cohort {
+        id: "arch".into(),
+        name: "Aegis Arch".into(),
+        icon: "A".into(),
+        layers: vec![Layer {
+            id: "arch-1".into(),
+            summary: "Bypasses the existing `Repo::find` abstraction".into(),
+            file: "src/handler.rs".into(),
+            line_start: 88,
+            line_end: 92,
+            severity: "warning".into(),
+            diff_range: "+let row = sqlx::query!(\"...\").fetch_one(&pool).await?;".into(),
+        }],
+    });
+    state.add_cohort(Cohort {
+        id: "verdict".into(),
+        name: "Aegis Verdict".into(),
+        icon: "V".into(),
+        layers: vec![Layer {
+            id: "verdict-1".into(),
+            summary: "Risk 0.62 / 1.00 — ReviewRequired".into(),
+            file: "—".into(),
+            line_start: 0,
+            line_end: 0,
+            severity: "error".into(),
+            diff_range: "Signed verdict: Halted (1 critical, 1 arch drift)".into(),
+        }],
+    });
+    state
+}
+
+/// `GET /review/:id` — render the cohort view for a PR.
+async fn review_page(Path(id): Path<String>) -> impl IntoResponse {
+    let state = demo_cohort_state(&id);
+    // Sanity check: the demo must populate all four analyst cohorts so the
+    // navigation keyboard hint in the rendered page is meaningful. The
+    // templates rely on cohort ordering; if `state.cohort(...)` ever
+    // returns None here, the demo seed is wrong.
+    debug_assert!(state.cohort("slop").is_some(), "demo missing slop cohort");
+    debug_assert!(
+        state.cohort("security").is_some(),
+        "demo missing security cohort"
+    );
+    debug_assert!(state.cohort("arch").is_some(), "demo missing arch cohort");
+    debug_assert!(
+        state.cohort("verdict").is_some(),
+        "demo missing verdict cohort"
+    );
+    Html(templates::render_dashboard(&state))
+}
+
+/// `GET /static/app.js` — the keyboard-nav handler. Embedded at compile
+/// time via `include_str!` so the binary has no runtime fs dependency.
+async fn app_js() -> impl IntoResponse {
+    (
+        [(
+            header::CONTENT_TYPE,
+            "application/javascript; charset=utf-8",
+        )],
+        APP_JS,
+    )
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
@@ -396,6 +526,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/", get(index))
         .route("/submit", get(submit_page).post(submit_form))
         .route("/weekly", get(weekly))
+        .route("/review/:id", get(review_page))
+        .route("/static/app.js", get(app_js))
         .route("/api/health", get(api_health))
         .route("/api/analyze", post(api_analyze))
         .route("/api/briefing", get(api_briefing))
