@@ -2,10 +2,18 @@
 name = "argus-cli"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "ARGUS crate: argus-cli — unified CLI for demos and testing"
+description = "Unified CLI for ARGUS. `argus health`, `argus verify`, `argus guard`, `argus lens` — all surfaces in one binary."
 repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+include = ["src/**/*.rs", "Cargo.toml", "README.md", "LICENSE"]
+publish = true
 
 [[bin]]
 name = "argus"

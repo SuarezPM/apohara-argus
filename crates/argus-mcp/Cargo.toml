@@ -2,10 +2,18 @@
 name = "argus-mcp"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "ARGUS MCP server [Refs: 5] — exposes the 4 specialists (slop, security, arch, verdict) as MCP tools for Claude Code / Codex / Cursor."
+description = "MCP server exposing 4 specialists (aegis_slop, aegis_security, aegis_arch, aegis_verdict) to Claude Code, Codex, and Cursor."
 repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+include = ["src/**/*.rs", "Cargo.toml", "README.md", "LICENSE"]
+publish = true
 
 [[bin]]
 name = "argus-mcp"

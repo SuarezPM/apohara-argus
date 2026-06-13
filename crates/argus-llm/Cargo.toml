@@ -2,10 +2,18 @@
 name = "argus-llm"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "ARGUS crate: argus-llm — BYOK LLM client (NVIDIA NIM primary)"
+description = "BYOK NVIDIA NIM client for ARGUS. Pass-through LLM inference with deterministic mock support."
 repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+include = ["src/**/*.rs", "Cargo.toml", "README.md", "LICENSE"]
+publish = true
 
 [dependencies]
 argus-core = { workspace = true }
