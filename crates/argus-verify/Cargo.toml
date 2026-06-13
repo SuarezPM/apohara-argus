@@ -38,6 +38,9 @@ ed25519-dalek = { workspace = true }
 # (`SigningKey::generate(&mut rand::rngs::OsRng)`). Ephemeral for the
 # in-memory store (Roadmap 2.2); production would load from KMS/HSM.
 rand = { workspace = true }
+# SQLite-backed audit store [Refs: 6.4]. Feature `sqlite` enables the
+# in-process driver; `migrate` lets us run schema migrations on startup.
+sqlx = { workspace = true, features = ["sqlite", "migrate"] }
 
 [dev-dependencies]
 # Used by `tests/shutdown.rs` to deliver SIGTERM/SIGINT to the test
