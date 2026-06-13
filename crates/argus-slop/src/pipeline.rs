@@ -4,6 +4,7 @@ use super::architecture::ArchReport;
 use super::security::SecurityReport;
 use super::slop_detector::SlopReport;
 use super::verdict::VerdictSynthesizer;
+use super::deterministic::{run_deterministic_rules, SlopSignal};
 use super::Analyzer;
 use argus_core::{Verdict, VerdictStatus, RiskScore};
 use argus_llm::LlmClient;
@@ -48,6 +49,12 @@ impl AnalysisPipeline {
         api_key: &str,
     ) -> PipelineOutput {
         let start = std::time::Instant::now();
+
+        // Phase 1: Deterministic pre-flight (free, < 100ms, no API calls).
+        // Catches mechanical slop (oversized fns, swallowed errors, unwraps)
+        // before we burn LLM tokens on semantic analysis.
+        let deterministic_signals: Vec<SlopSignal> = run_deterministic_rules(diff);
+
         let slop_fut = self.slop.run(client, diff, context, api_key);
         let sec_fut = self.security.run(client, diff, context, api_key);
         let arch_fut = self.arch.run(client, diff, context, api_key);

@@ -17,12 +17,14 @@ pub mod security;
 pub mod architecture;
 pub mod verdict;
 pub mod pipeline;
+pub mod deterministic;
 
 pub use slop_detector::{SlopDetector, SlopReport};
 pub use security::{SecurityReview, SecurityReport, SecurityFinding};
 pub use architecture::{ArchitectureFit, ArchReport};
 pub use verdict::{VerdictSynthesizer, SynthesizerInput};
 pub use pipeline::{AnalysisPipeline, PipelineOutput};
+pub use deterministic::{run_deterministic_rules, SlopSignal, Severity, OVERSIZED_FN_LOC};
 
 use argus_core::{PRFinding, Result as ArgusResult};
 use argus_llm::LlmClient;
