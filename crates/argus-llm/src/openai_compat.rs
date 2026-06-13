@@ -140,11 +140,24 @@ impl LlmClient for OpenAICompatClient {
 
         let status = resp.status();
         if !status.is_success() {
+            // Capture the `Retry-After` header (seconds form) BEFORE we
+            // consume the response body. We only honor it for 429/503,
+            // which are the codes that actually carry a meaningful hint.
+            let retry_after = if status.as_u16() == 429 || status.as_u16() == 503 {
+                resp.headers()
+                    .get("retry-after")
+                    .and_then(|h| h.to_str().ok())
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .map(Duration::from_secs)
+            } else {
+                None
+            };
+
             let text = resp.text().await.unwrap_or_default();
+            if status.as_u16() == 429 || status.as_u16() == 503 {
+                return Err(LlmError::RateLimited { retry_after });
+            }
             if let Ok(err) = serde_json::from_str::<ApiError>(&text) {
-                if status.as_u16() == 429 {
-                    return Err(LlmError::RateLimited { retry_after: None });
-                }
                 return Err(LlmError::Api {
                     status: status.as_u16(),
                     message: err.error.message,

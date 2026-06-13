@@ -19,10 +19,12 @@ use std::time::Duration;
 use thiserror::Error;
 
 pub mod audit;
+pub mod circuit_breaker;
 pub mod model_registry;
 pub mod nim;
 pub mod openai_compat;
 pub mod mock;
+pub mod retry;
 
 pub use model_registry::{ModelRegistry, ModelRole};
 
@@ -32,11 +34,13 @@ pub mod dalle;
 #[cfg(feature = "heygen")]
 pub mod heygen;
 
+pub use circuit_breaker::{CircuitBreakerConfig, CircuitError, CircuitState, LlmCircuitBreaker};
 pub use nim::NimClient;
 pub use openai_compat::OpenAICompatClient;
 pub use mock::MockClient;
+pub use retry::{RetryClient, RetryConfig};
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum LlmError {
     #[error("HTTP error: {0}")]
     Http(String),
@@ -50,6 +54,28 @@ pub enum LlmError {
     Timeout(Duration),
     #[error("Rate limited — retry after {retry_after:?}")]
     RateLimited { retry_after: Option<Duration> },
+    /// Circuit breaker is open — calls are being short-circuited.
+    /// Not retryable; the upstream should be considered down.
+    #[error("Circuit breaker is open — upstream is unhealthy")]
+    CircuitOpen,
+}
+
+impl LlmError {
+    /// Whether the retry decorator should attempt another call.
+    ///
+    /// Retryable: network errors, timeouts, 429, 503, 5xx.
+    /// Not retryable: 4xx (except 429), parse errors, missing key, circuit open.
+    pub fn is_retryable(&self) -> bool {
+        match self {
+            LlmError::RateLimited { .. } => true,
+            LlmError::Timeout(_) => true,
+            LlmError::Http(_) => true,
+            LlmError::Api { status, .. } => *status == 429 || *status == 503 || *status >= 500,
+            LlmError::Parse(_) => false,
+            LlmError::MissingKey => false,
+            LlmError::CircuitOpen => false,
+        }
+    }
 }
 
 /// A chat message. We use the OpenAI-compatible format internally.
