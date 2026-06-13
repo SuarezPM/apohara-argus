@@ -1,0 +1,241 @@
+name: Release
+
+# Builds the v0.1 cross-platform binaries (5 targets), regenerates
+# THIRD-PARTY-LICENSES, signs each binary with a SLSA Build L3 provenance
+# attestation via the isolated reusable _attest workflow, and assembles a
+# SHA256 manifest of the artifacts.
+#
+# This workflow does NOT publish to crates.io (publish.yml does that,
+# maintainer-triggered, irreversible). It DOES create a draft GitHub Release
+# via softprops/action-gh-release AFTER attestation — the maintainer reviews
+# and publishes the release.
+#
+# Triggers:
+#   - push tag v*  (the canonical release path)
+#   - workflow_dispatch (manual dry-run / pre-flight)
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+# Read-only by default. The `attest` job widens to id-token/attestations
+# write so the SLSA L3 keyless signing + attestation write can work. The
+# build job intentionally does NOT hold signing scopes (SLSA L3 isolation:
+# the build cannot influence its own provenance).
+permissions:
+  contents: read
+
+jobs:
+  third-party-licenses:
+    name: regenerate THIRD-PARTY-LICENSES
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+      - name: Install cargo-about
+        uses: taiki-e/install-action@56545b37b57562edd73171cb6c62cc509db4c34e # v2
+        with:
+          tool: cargo-about
+      - name: Generate THIRD-PARTY-LICENSES
+        run: cargo about generate about.hbs -o THIRD-PARTY-LICENSES
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: THIRD-PARTY-LICENSES
+          path: THIRD-PARTY-LICENSES
+
+  build:
+    name: build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    # SLSA L3 isolation: the build job holds NO signing scopes. Provenance is
+    # generated in the separate reusable `attest` job (uses: ./.github/
+    # workflows/_attest.yml), so caller-controlled build steps cannot forge
+    # or influence signing. The build only stages + uploads the binary.
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            ext: ""
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            ext: ""
+            cross: true
+            cross_image: ""  # default cross image (debian stable)
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            ext: ""
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            ext: ""
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            ext: ".exe"
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2.7.4
+
+      # aarch64-unknown-linux-gnu is cross-compiled with `cross` (provides
+      # the cross toolchain + a suitable container image). The other four
+      # targets build natively on their respective runners.
+      - name: Install cross (aarch64 Linux glibc)
+        if: matrix.cross == true
+        run: cargo install cross --locked
+
+      - name: Build (native)
+        if: matrix.cross != true
+        run: cargo build --release --locked --bin argus --target ${{ matrix.target }}
+
+      - name: Build (cross, default image)
+        if: matrix.cross == true && matrix.cross_image == ''
+        run: cross build --release --locked --bin argus --target ${{ matrix.target }}
+
+      - name: Build (cross, custom image)
+        if: matrix.cross == true && matrix.cross_image != ''
+        run: |
+          cat > Cross.toml <<EOF
+          [target.${{ matrix.target }}]
+          image = "${{ matrix.cross_image }}"
+          EOF
+          cross build --release --locked --bin argus --target ${{ matrix.target }}
+
+      - name: Stage artifact
+        shell: bash
+        run: |
+          mkdir -p dist
+          src="target/${{ matrix.target }}/release/argus${{ matrix.ext }}"
+          dst="dist/argus-${{ matrix.target }}${{ matrix.ext }}"
+          cp "$src" "$dst"
+
+      - name: Compute SHA256
+        shell: bash
+        run: |
+          cd dist
+          f="argus-${{ matrix.target }}${{ matrix.ext }}"
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "$f" > "$f.sha256"
+          else
+            shasum -a 256 "$f" > "$f.sha256"
+          fi
+          cat "$f.sha256"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: argus-${{ matrix.target }}
+          path: dist/*
+
+  # SLSA Build L3: isolated provenance generation. One call per target into
+  # the reusable workflow, which downloads that target's staged binary and
+  # signs it in a fresh job/VM with no caller build steps. A provenance
+  # attestation per target, with signing moved out of the build job (the
+  # build cannot forge it).
+  #
+  # Verification after a public run:
+  #   slsa-verifier verify-artifact argus-x86_64-unknown-linux-gnu \
+  #     --provenance-path argus-x86_64-unknown-linux-gnu.intoto.jsonl \
+  #     --source-uri github.com/SuarezPM/apohara-argus \
+  #     --github-workflow-ref .github/workflows/_attest.yml
+  attest:
+    name: attest ${{ matrix.target }}
+    needs: build
+    # Caller job must ALSO declare these for the reusable workflow's
+    # keyless OIDC signing + attestation write to work.
+    permissions:
+      id-token: write
+      attestations: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            ext: ""
+          - target: aarch64-unknown-linux-gnu
+            ext: ""
+          - target: x86_64-apple-darwin
+            ext: ""
+          - target: aarch64-apple-darwin
+            ext: ""
+          - target: x86_64-pc-windows-msvc
+            ext: ".exe"
+    uses: ./.github/workflows/_attest.yml
+    with:
+      artifact-name: argus-${{ matrix.target }}
+      subject-name: argus-${{ matrix.target }}${{ matrix.ext }}
+
+  manifest:
+    name: assemble SHA256 manifest
+    needs: [build, third-party-licenses]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: artifacts
+      - name: Build combined SHA256SUMS
+        shell: bash
+        run: |
+          mkdir -p release
+          # Collect every binary into one directory.
+          find artifacts -type f -name 'argus-*' ! -name '*.sha256' -exec cp {} release/ \;
+          cp -f artifacts/THIRD-PARTY-LICENSES/THIRD-PARTY-LICENSES release/ || true
+          cd release
+          : > SHA256SUMS
+          for f in argus-*; do
+            if command -v sha256sum >/dev/null 2>&1; then
+              sha256sum "$f" >> SHA256SUMS
+            else
+              shasum -a 256 "$f" >> SHA256SUMS
+            fi
+          done
+          echo "----- SHA256SUMS -----"
+          cat SHA256SUMS
+      - name: Upload release bundle (for maintainer review)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: argus-v0.1.0-release
+          path: release/*
+
+  # Creates a DRAFT GitHub Release (maintainer reviews and publishes).
+  # The release is created after attestation, so the maintainer can verify
+  # SLSA L3 provenance in the draft before making it public.
+  gh-release:
+    name: create draft GitHub Release
+    needs: [manifest, attest]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # required to create a release
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: artifacts
+      - name: Assemble release files
+        run: |
+          mkdir -p release
+          find artifacts -type f -name 'argus-*' ! -name '*.sha256' -exec cp {} release/ \;
+          cp -f artifacts/THIRD-PARTY-LICENSES/THIRD-PARTY-LICENSES release/ || true
+      - name: Create draft GitHub Release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            release/argus-*
+            release/THIRD-PARTY-LICENSES

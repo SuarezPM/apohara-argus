@@ -1,0 +1,74 @@
+name: Publish to crates.io
+
+# Maintainer-triggered ONLY (workflow_dispatch). Publishing is irreversible —
+# a released version cannot be deleted (only yanked) — so this NEVER runs
+# automatically. The maintainer reviews the current default-branch version,
+# ensures the lockfile is committed, then dispatches this workflow with the
+# `CARGO_REGISTRY_TOKEN` repository secret set.
+#
+# Publishes the 7 public crates in dependency order, sequentially. The 6
+# internal crates (argus-{core,crypto,slop,github,agent,otel}) are marked
+# `publish = false` in the workspace and are NEVER published.
+on:
+  workflow_dispatch:
+
+# Read-only by default. cargo publish authenticates via the
+# CARGO_REGISTRY_TOKEN env var, not via a GITHUB token, so we keep the
+# job's token scope minimal.
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: cargo publish (7 crates, sequential)
+    runs-on: ubuntu-latest
+    # Sequential by design: a later crate's `cargo publish` may depend on
+    # an earlier crate's just-published version being available in the
+    # crates.io index. A matrix would race.
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+
+      # Public crates in dependency order. The 6 internal crates
+      # (argus-{core,crypto,slop,github,agent,otel}) are publish = false
+      # and are skipped automatically by `cargo publish -p`.
+      #
+      # `--locked` enforces the committed Cargo.lock; `--no-verify` would
+      # skip the post-publish build check and is NEVER used here (a broken
+      # published crate is a yank — irreversible at scale).
+      - name: Publish argus-llm
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p argus-llm --locked
+
+      - name: Publish argus-guard
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p argus-guard --locked
+
+      - name: Publish argus-verify
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p argus-verify --locked
+
+      - name: Publish argus-lens
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p argus-lens --locked
+
+      - name: Publish argus-dashboard
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p argus-dashboard --locked
+
+      - name: Publish argus-cli
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p argus-cli --locked
+
+      - name: Publish argus-mcp
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p argus-mcp --locked
