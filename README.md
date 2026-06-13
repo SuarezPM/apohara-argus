@@ -11,6 +11,9 @@
 ![BYOK](https://img.shields.io/badge/BYOK-NVIDIA%20NIM-76b900)
 ![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)
 ![Tests 145+](https://img.shields.io/badge/tests-145%2B%20passing-brightgreen)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/SuarezPM/apohara-argus/badge)](https://scorecard.dev/viewer/?uri=github.com/SuarezPM/apohara-argus)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/XXXXX/badge)](https://www.bestpractices.dev/projects/XXXXX)
+[Security](SECURITY.md)
 
 ---
 
