@@ -6,9 +6,8 @@ use super::security::SecurityReport;
 use super::slop_detector::SlopReport;
 use super::verdict::VerdictSynthesizer;
 use super::Analyzer;
-use apohara_argus_core::{RiskScore, Verdict, VerdictStatus};
+use apohara_argus_core::{Verdict, VerdictStatus};
 use argus_llm::LlmClient;
-use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,7 +52,7 @@ impl AnalysisPipeline {
         // Phase 1: Deterministic pre-flight (free, < 100ms, no API calls).
         // Catches mechanical slop (oversized fns, swallowed errors, unwraps)
         // before we burn LLM tokens on semantic analysis.
-        let deterministic_signals: Vec<SlopSignal> = run_deterministic_rules(diff);
+        let _deterministic_signals: Vec<SlopSignal> = run_deterministic_rules(diff);
 
         let slop_fut = self.slop.run(client, diff, context, api_key);
         let sec_fut = self.security.run(client, diff, context, api_key);

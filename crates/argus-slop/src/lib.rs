@@ -26,7 +26,6 @@ pub use security::{SecurityFinding, SecurityReport, SecurityReview};
 pub use slop_detector::{SlopDetector, SlopReport};
 pub use verdict::{SynthesizerInput, VerdictSynthesizer};
 
-use apohara_argus_core::{PRFinding, Result as ArgusResult};
 use argus_llm::LlmClient;
 use async_trait::async_trait;
 use thiserror::Error;

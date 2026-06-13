@@ -8,8 +8,6 @@
 //! Uses the `Authorization: token <PAT>` header. The PAT needs `repo` scope
 //! for posting comments and labels.
 
-use async_trait::async_trait;
-use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -223,6 +221,7 @@ impl GitHubClient {
     }
 
     /// Format an ARGUS verdict as a GitHub-flavored Markdown comment.
+    #[allow(clippy::too_many_arguments)]
     pub fn format_verdict_comment(
         pr_ref: &str,
         verdict_status: &str,
@@ -249,7 +248,7 @@ impl GitHubClient {
         s.push_str(&format!("**Risk score:** {:.2} / 1.00\n\n", risk_score));
         s.push_str(&format!("{}\n\n", summary));
         s.push_str("### Scores\n\n");
-        s.push_str(&format!("| Metric | Score |\n|---|---|\n"));
+        s.push_str("| Metric | Score |\n|---|---|\n");
         s.push_str(&format!("| AI slop score | {:.2} |\n", slop_score));
         s.push_str(&format!("| Architecture fit | {:.2} |\n", fit_score));
         s.push_str(&format!("| Security | {} |\n\n", security_summary));
