@@ -222,7 +222,7 @@ cargo build --release
 ```bash
 npx @apohara/argus health
 # or
-apohara-argus health
+argus health
 # or
 docker run -e ARGUS_NIM_KEY=$YOUR_NIM_KEY SuarezPM/apohara-argus health
 ```
