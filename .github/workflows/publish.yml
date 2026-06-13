@@ -6,9 +6,26 @@ name: Publish to crates.io
 # ensures the lockfile is committed, then dispatches this workflow with the
 # `CARGO_REGISTRY_TOKEN` repository secret set.
 #
-# Publishes the 7 public crates in dependency order, sequentially. The 6
-# internal crates (argus-{core,crypto,slop,github,agent,otel}) are marked
-# `publish = false` in the workspace and are NEVER published.
+# Publishes the 7 public crates in dependency order, in a job chain
+# (publish-llm -> publish-guard -> publish-verify -> publish-lens ->
+# publish-dashboard -> publish-apohara-argus-cli -> publish-apohara-argus-mcp).
+#
+# The 6 internal crates (apohara-argus-core, argus-{crypto,slop,github,
+# agent,otel}) are marked `publish = false` in the workspace and are NEVER
+# published.
+#
+# ───────────────────────────────────────────────────────────────────────────
+# Why a job chain, not a `matrix:`?
+# ───────────────────────────────────────────────────────────────────────────
+# The B.5 plan said "matrix strategy" but the right pattern for `cargo
+# publish` is a sequential job chain. A later crate's `cargo publish` may
+# depend on an earlier crate's just-published version being present in
+# the crates.io sparse index; a real matrix would race the index
+# propagation and fail with a spurious "no matching package" error.
+# Splitting into 7 jobs with a `needs:` chain enforces the dep order
+# deterministically. The `concurrency:` group below also prevents two
+# concurrent dispatch runs (e.g. double-clicks) from racing the same
+# crates.io namespace.
 on:
   workflow_dispatch:
 
@@ -18,23 +35,34 @@ on:
 permissions:
   contents: read
 
+# Prevent concurrent publishes for the same release tag. If a maintainer
+# accidentally double-dispatches, the second run waits for the first to
+# finish — no two publishes ever overlap on the same crates.io namespace.
+concurrency:
+  group: publish-${{ github.event.release.tag_name || 'manual' }}
+  cancel-in-progress: false
+
 jobs:
-  publish:
-    name: cargo publish (7 crates, sequential)
+  # ─────────────────────────────────────────────────────────────────────
+  # Job chain: each job publishes exactly one crate and depends on the
+  # previous one finishing successfully. This is the correct pattern for
+  # `cargo publish` with inter-crate dep ordering; a `matrix:` would
+  # race the crates.io index and fail intermittently.
+  #
+  # All actions are SHA-pinned (S.3) and `persist-credentials: false`
+  # to keep the GITHUB_TOKEN out of the post-checkout git config —
+  # `cargo publish` uses CARGO_REGISTRY_TOKEN exclusively, not a
+  # workflow-generated GITHUB_TOKEN.
+  # ─────────────────────────────────────────────────────────────────────
+
+  publish-llm:
+    name: cargo publish -p argus-llm
     runs-on: ubuntu-latest
-    # Sequential by design: a later crate's `cargo publish` may depend on
-    # an earlier crate's just-published version being available in the
-    # crates.io index. A matrix would race.
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
-
-      # Public crates in dependency order. The 6 internal crates
-      # (apohara-argus-core, argus-{crypto,slop,github,agent,otel}) are publish = false
-      # and are skipped automatically by `cargo publish -p`.
-      #
       # `--locked` enforces the committed Cargo.lock; `--no-verify` would
       # skip the post-publish build check and is NEVER used here (a broken
       # published crate is a yank — irreversible at scale).
@@ -43,31 +71,85 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish -p argus-llm --locked
 
+  publish-guard:
+    name: cargo publish -p argus-guard
+    needs: publish-llm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - name: Publish argus-guard
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish -p argus-guard --locked
 
+  publish-verify:
+    name: cargo publish -p argus-verify
+    needs: publish-guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - name: Publish argus-verify
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish -p argus-verify --locked
 
+  publish-lens:
+    name: cargo publish -p argus-lens
+    needs: publish-verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - name: Publish argus-lens
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish -p argus-lens --locked
 
+  publish-dashboard:
+    name: cargo publish -p argus-dashboard
+    needs: publish-lens
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - name: Publish argus-dashboard
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish -p argus-dashboard --locked
 
+  publish-apohara-argus-cli:
+    name: cargo publish -p apohara-argus-cli
+    needs: publish-dashboard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - name: Publish apohara-argus-cli
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish -p apohara-argus-cli --locked
 
+  publish-apohara-argus-mcp:
+    name: cargo publish -p apohara-argus-mcp
+    needs: publish-apohara-argus-cli
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - name: Publish apohara-argus-mcp
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
