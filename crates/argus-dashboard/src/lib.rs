@@ -1,14 +1,16 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! The argus-dashboard library — the SSR landing page and the public
+//! HTTP surface for the open-core gate.
+//!
+//! The binary target in `src/main.rs` wires the dashboard server; the
+//! integration tests in `tests/premium_gate.rs` exercise the premium
+//! gate against the same `routes()` builder the binary uses.
+//!
+//! Public surface:
+//! - `state::{AppState, DashboardState, Cohort, Layer, premium_from_env}`
+//! - `premium::{routes, premium_required_response}`
+//!
+//! Everything else is internal to the binary.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub mod premium;
+pub mod state;
+pub mod templates;

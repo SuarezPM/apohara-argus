@@ -8,7 +8,6 @@
 //! The form posts to the same binary's `/api/analyze` endpoint, which runs
 //! the same pipeline as the CLI. The verdict is shown in-page.
 
-use argus_llm::NimClient;
 use argus_verify::VerifyWorker;
 use axum::{
     extract::{Form, Path, State},
@@ -17,29 +16,20 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing_subscriber::EnvFilter;
-use uuid::Uuid;
 
-mod state;
-mod templates;
-
-use state::{Cohort, DashboardState, Layer};
+use argus_dashboard::premium::routes as premium_routes;
+use argus_dashboard::state::{AppState, Cohort, DashboardState, Layer};
+use argus_dashboard::templates;
 
 // The keyboard-nav JS is embedded at compile time so the binary has no
 // runtime dependency on the working directory. This keeps `cargo run` +
 // `curl` working from any cwd.
 const APP_JS: &str = include_str!("../static/app.js");
-
-#[derive(Clone)]
-struct AppState {
-    worker: Arc<VerifyWorker>,
-    nim_model: String,
-    briefings_path: PathBuf,
-}
 
 #[derive(Deserialize, Debug)]
 struct AnalyzeBody {
@@ -720,11 +710,14 @@ async fn main() -> anyhow::Result<()> {
         w
     };
 
-    let state = AppState {
-        worker: Arc::new(worker),
+    let state = AppState::with_premium_from_env(
+        Arc::new(worker),
         nim_model,
-        briefings_path: PathBuf::from("./docs/briefings/latest.md"),
-    };
+        PathBuf::from("./docs/briefings/latest.md"),
+    );
+    if state.premium {
+        eprintln!("argus-dashboard: ARGUS_PREMIUM=true — enterprise routes enabled");
+    }
 
     let app = Router::new()
         .route("/", get(index))
@@ -736,6 +729,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/demo", get(api_demo))
         .route("/api/analyze", post(api_analyze))
         .route("/api/briefing", get(api_briefing))
+        .merge(premium_routes())
         .with_state(state);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));

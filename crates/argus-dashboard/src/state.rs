@@ -10,7 +10,10 @@
 //! They're plain serde types so they can be serialized to JSON for
 //! future htmx endpoints or stored verbatim in the audit log.
 
+use argus_verify::VerifyWorker;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use std::sync::Arc;
 
 /// A cohort is a named grouping of layers (a "storyline" of a PR change).
 /// Inspired by CodeRabbit's "Change Stack" pattern.
@@ -35,21 +38,28 @@ pub struct Layer {
 }
 
 /// The full dashboard state, holding all cohorts for a PR review.
+///
+/// `premium` is initialized from the `ARGUS_PREMIUM` env var on
+/// construction; it gates the 5 enterprise routes (org dashboards, custom
+/// policy packs, SIEM export). See [`premium_from_env`].
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct DashboardState {
     pub pr_url: String,
     pub pr_title: String,
     pub cohorts: Vec<Cohort>,
+    pub premium: bool,
 }
 
 impl DashboardState {
     /// Build an empty state for a given PR. Cohorts are added with
-    /// [`Self::add_cohort`].
+    /// [`Self::add_cohort`]. The `premium` flag is read from the
+    /// `ARGUS_PREMIUM` env var (true / 1 enables, anything else is off).
     pub fn from_review(pr_url: String, pr_title: String) -> Self {
         Self {
             pr_url,
             pr_title,
             cohorts: Vec::new(),
+            premium: premium_from_env(),
         }
     }
 
@@ -68,6 +78,48 @@ impl DashboardState {
     /// Total layer count across all cohorts.
     pub fn total_layers(&self) -> usize {
         self.cohorts.iter().map(|c| c.layers.len()).sum()
+    }
+}
+
+/// Read the `ARGUS_PREMIUM` env var. Returns `true` only for the
+/// canonical opt-ins `"true"` and `"1"`. Anything else (including unset
+/// and empty) is `false`. This is the single source of truth for the
+/// open-core gate; keep new entry points (tests, scripts, docs) going
+/// through this function instead of re-deriving the rule.
+pub fn premium_from_env() -> bool {
+    std::env::var("ARGUS_PREMIUM")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(false)
+}
+
+/// The axum state shared by every route handler in the dashboard binary.
+///
+/// The 5 premium routes ([`crate::premium`]) read `premium` to decide
+/// between a 402 JSON body and a stub HTML page. The remaining fields
+/// are the existing dashboard wiring (worker, NIM model, briefing path)
+/// unchanged from the pre-gate binary.
+#[derive(Clone)]
+pub struct AppState {
+    pub worker: Arc<VerifyWorker>,
+    pub nim_model: String,
+    pub briefings_path: PathBuf,
+    pub premium: bool,
+}
+
+impl AppState {
+    /// Convenience constructor that wires `premium` from
+    /// [`premium_from_env`]. The other fields are passed through.
+    pub fn with_premium_from_env(
+        worker: Arc<VerifyWorker>,
+        nim_model: String,
+        briefings_path: PathBuf,
+    ) -> Self {
+        Self {
+            worker,
+            nim_model,
+            briefings_path,
+            premium: premium_from_env(),
+        }
     }
 }
 
@@ -127,5 +179,20 @@ mod tests {
         assert_eq!(s.pr_title, "T");
         assert!(s.cohorts.is_empty());
         assert_eq!(s.total_layers(), 0);
+    }
+
+    #[test]
+    fn default_dashboard_state_has_premium_false() {
+        let s = DashboardState::default();
+        assert!(!s.premium);
+    }
+
+    #[test]
+    fn premium_from_env_is_callable() {
+        // The function must compile and return a bool. We don't mutate
+        // the env here (test-isolation nightmare); the integration tests
+        // in `tests/premium_gate.rs` exercise the actual gate via
+        // `AppState { premium: ..., .. }` instead.
+        let _v: bool = premium_from_env();
     }
 }
