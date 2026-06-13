@@ -229,6 +229,34 @@ curl http://localhost:8080/audit/export?from=2026-01-01 | tail -1
 
 ---
 
+## Open-core model
+
+ARGUS follows the open-core model:
+
+- **The MIT-licensed core** (every crate in `crates/` except the dashboard
+  premium features) is free for all use, including commercial. This is the
+  whole detection pipeline, the audit chain, the MCP server, and the basic
+  landing page. `cargo install apohara-argus-cli` and `npx @apohara/argus`
+  get you the core.
+
+- **The dashboard premium features** (multi-tenant org dashboards, custom
+  policy packs, SIEM export) are dual-licensed (MIT for OSS use, commercial
+  for production enterprise). Enable with `ARGUS_PREMIUM=true`. See
+  [docs/pricing.md](docs/pricing.md) for the 3 tiers.
+
+We use this model to fund the MIT core: the enterprise tier is the margin
+that pays for the maintainer's time and the audit chain integrity work. The
+MIT core is the product. The enterprise tier is the support contract.
+
+The dashboard's premium gate is a runtime HTTP 402 — every gated route
+returns a JSON body with `error: "premium_required"`, `tier: "Enterprise"`,
+and `url: "/pricing"`. The MIT binary never silently downgrades. The 5
+gated routes (post-P.4) are stubs that ship in v0.5.0; the gate itself is
+wired and tested today. The full pricing breakdown is in
+[docs/pricing.md](docs/pricing.md).
+
+---
+
 ## The 19 features shipped (1 of 20 deliberately not done)
 
 | # | Feature | Item | What you get |
