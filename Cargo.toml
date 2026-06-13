@@ -22,8 +22,13 @@ edition = "2021"
 rust-version = "1.88"
 license = "MIT"
 authors = ["Apohara <apohara.dev>"]
-description = "ARGUS — AI slop defense layer for the AI-generated code era"
+description = "AI slop defense layer for code review (PR review, pre-commit guard, MCP server, audit chain)"
 repository = "https://github.com/SuarezPM/apohara-argus"
+homepage = "https://github.com/SuarezPM/apohara-argus"
+documentation = "https://docs.rs/argus-cli"
+readme = "README.md"
+keywords = ["ai", "code-review", "mcp", "eu-ai-act", "byok", "rust"]
+categories = ["command-line-utilities", "development-tools::cargo-plugins", "api-bindings"]
 
 [workspace.dependencies]
 # Async runtime

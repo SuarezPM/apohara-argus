@@ -6,6 +6,10 @@ license.workspace = true
 authors.workspace = true
 description = "ARGUS crate: argus-core — types, errors, prompts, config"
 repository.workspace = true
+# Internal library — not published to crates.io. Surface to users goes
+# through the `argus-cli` / `argus-guard` / `argus-verify` / `argus-lens`
+# / `argus-dashboard` / `argus-llm` / `argus-mcp` public crates.
+publish = false
 
 [dependencies]
 serde = { workspace = true }

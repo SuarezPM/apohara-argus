@@ -6,6 +6,10 @@ license.workspace = true
 authors.workspace = true
 description = "ARGUS crate: argus-slop — the 4 analyzers (slop/security/arch/verdict)"
 repository.workspace = true
+# Internal library — not published to crates.io. The deterministic
+# regex + LLM analyzer pipeline is exposed via the public surfaces
+# (CLI / guard / verify / lens / dashboard), not as a standalone crate.
+publish = false
 
 [dependencies]
 argus-core = { workspace = true }

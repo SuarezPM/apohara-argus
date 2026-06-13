@@ -6,6 +6,10 @@ license.workspace = true
 authors.workspace = true
 description = "ARGUS crate: argus-agent — the agent as documented Rust code (P4 deliverable)"
 repository.workspace = true
+# Internal library — not published to crates.io. The agent runtime
+# is wired into argus-verify and the MCP surface; it is not a
+# standalone public API.
+publish = false
 
 [dependencies]
 argus-core = { workspace = true }

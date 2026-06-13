@@ -6,6 +6,10 @@ license.workspace = true
 authors.workspace = true
 description = "ARGUS OpenTelemetry initialization helpers (stdout exporter, opt-in via env var). [Refs: 6.3]"
 repository.workspace = true
+# Internal library — not published to crates.io. The OpenTelemetry
+# stdout exporter is wired into the runtime crates as an opt-in
+# feature; it is not a standalone public surface.
+publish = false
 
 [dependencies]
 opentelemetry = { workspace = true }
