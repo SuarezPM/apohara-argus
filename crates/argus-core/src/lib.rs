@@ -17,7 +17,7 @@ pub use types::{
     PRFinding, FindingSeverity, RiskScore, Verdict, VerdictStatus,
     PRReview, AgentAction, AgentRole, LedgerEntry, LedgerEntryKind,
     OrgSummary, WeeklyBriefing, OffenderSummary, TeamSummary,
-    AuditEvent, DecisionArtifact, ToolCallRecord, Manifest,
+    AuditEvent, DecisionArtifact, ToolCallRecord, Manifest, DataClass,
     FixPlan, FixStep, FixStepKind,
 };
 pub use prompts::{Prompt, PromptLibrary, PromptMetadata};

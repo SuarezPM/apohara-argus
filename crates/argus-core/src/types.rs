@@ -260,7 +260,47 @@ pub struct DecisionArtifact {
     pub rationale: String,
 }
 
-/// The 13-field EU AI Act Article 12 audit record. See module docs.
+/// Classification of the data the LLM call touched. Required by
+/// `certifieddata/ai-decision-logging-spec` (Level 2 conformance,
+/// April 2026) and EU AI Act Art. 12 (data minimisation, retention
+/// scoping).
+///
+/// `Mixed` means the prompt contained more than one class. Callers
+/// should err on the side of `Mixed` rather than `None` when in
+/// doubt — the regulator's default posture is "treat as sensitive".
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum DataClass {
+    /// No data class assigned yet (pre-12.4 — this event is "metadata
+    /// only" or "test").
+    None,
+    /// Source code (e.g., a PR diff). Default for ARGUS — most of our
+    /// events see code.
+    SourceCode,
+    /// Personally identifiable information (emails, names, addresses).
+    /// GDPR Art. 4(1) — special handling.
+    Pii,
+    /// Protected health information (HIPAA-style). ARGUS doesn't see
+    /// this by default; the variant exists for completeness.
+    Phi,
+    /// Contract / legal text. The retention clock is different
+    /// (typically 7y per commercial-contract norms).
+    Contract,
+    /// Two or more of the above in a single prompt/response.
+    Mixed,
+    /// Could not classify at write time. Auditors will flag these
+    /// for manual review.
+    Unknown,
+}
+
+/// The 15-field EU AI Act Article 12 audit record (Level 2 conformance
+/// per `certifieddata/ai-decision-logging-spec` April 2026).
+///
+/// v2 (this version) adds `data_class` and `policy_version` over the
+/// v1 (Roadmap 2.1) 13-field record. Both new fields are required —
+/// omitting them is a compile error, not a runtime fallback. The
+/// reasoning: a regulator-facing audit log that *defaults* to
+/// "unknown" data class is, by definition, not auditable.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct AuditEvent {
@@ -289,6 +329,15 @@ pub struct AuditEvent {
     pub output_tokens: u32,
     /// Estimated cost in USD based on a static pricing table.
     pub estimated_cost_usd: f64,
+    /// What kind of data the LLM call saw. Drives the retention
+    /// clock: `SourceCode` = 1y, `Pii`/`Phi` = 1y (GDPR/HIPAA), but
+    /// `Contract` = 7y. See `certifieddata/ai-decision-logging-spec`
+    /// §3.2 for the exact mapping. [Refs: 4 EU AI Act L2]
+    pub data_class: DataClass,
+    /// Semver of the active policy bundle (prompts + thresholds) at
+    /// write time. Auditors can reproduce the exact behavior by
+    /// checking out this version of the repo. [Refs: 4 EU AI Act L2]
+    pub policy_version: String,
     /// The decision this LLM call produced.
     pub decision: DecisionArtifact,
     /// BLAKE3 hash of the previous `AuditEvent` in the same session chain.
@@ -589,6 +638,9 @@ mod tests {
             input_tokens: 100,
             output_tokens: 50,
             estimated_cost_usd: 0.0,
+            // EU AI Act Level 2 fields [Refs: 4]:
+            data_class: DataClass::SourceCode,
+            policy_version: "test-policy-v1".to_string(),
             decision: DecisionArtifact {
                 verdict: "warn".into(),
                 findings_count: 2,
@@ -621,11 +673,11 @@ mod tests {
         assert_eq!(back.prev_hash, event.prev_hash);
         assert_eq!(back.signature.to_bytes(), event.signature.to_bytes());
 
-        // Sniff-check JSON shape: 14 top-level keys (one per struct field).
-        // (Spec title says "13 fields" but the field list in MUST DO #2
-        // has 14 — we go with the field list as the source of truth.)
+        // Sniff-check JSON shape: 16 top-level keys (one per struct field,
+        // post EU AI Act L2 conformance — adds `data_class` and
+        // `policy_version` over the original 14).
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
-        assert_eq!(v.as_object().unwrap().len(), 14);
+        assert_eq!(v.as_object().unwrap().len(), 16);
     }
 
     #[test]

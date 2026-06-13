@@ -93,7 +93,7 @@ impl InMemoryAuditStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use argus_core::{AuditEvent, DecisionArtifact};
+    use argus_core::{AuditEvent, DataClass, DecisionArtifact};
     use chrono::{TimeZone, Utc};
     use ed25519_dalek::{Signer, SigningKey};
     use uuid::Uuid;
@@ -112,6 +112,8 @@ mod tests {
             input_tokens: 10,
             output_tokens: 5,
             estimated_cost_usd: 0.0,
+            data_class: DataClass::SourceCode,
+            policy_version: "test-v1".to_string(),
             decision: DecisionArtifact {
                 verdict: "warn".into(),
                 findings_count: 1,

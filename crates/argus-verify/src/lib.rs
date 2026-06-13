@@ -10,7 +10,7 @@
 //! If a GitHub token is configured, the worker will also post a comment
 //! and set a label on the PR.
 
-use argus_core::{ArgusError, DecisionArtifact, FixPlan, PRReview, Verdict, VerdictStatus, RiskScore};
+use argus_core::{ArgusError, DataClass, DecisionArtifact, FixPlan, PRReview, Verdict, VerdictStatus, RiskScore};
 use argus_crypto::chain::append;
 use argus_crypto::identity::AgentKeypair;
 use argus_github::GitHubClient;
@@ -265,6 +265,8 @@ impl VerifyWorker {
             audit_prev,
             None,
             None,
+            DataClass::SourceCode, // EU AI Act L2: PR diffs are source code
+            "verify-worker-v1-policy", // policy_version
             &self.audit_signing_key,
         );
         // Advance the audit chain so the next emission links to this one.

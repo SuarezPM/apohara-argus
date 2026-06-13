@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use ed25519_dalek::SigningKey;
 use std::sync::{Arc, Mutex};
 
-use argus_core::DecisionArtifact;
+use argus_core::{DataClass, DecisionArtifact};
 
 use super::audit::{emit_audit_event, next_prev_hash};
 use super::circuit_breaker::{CircuitBreakerConfig, LlmCircuitBreaker};
@@ -221,6 +221,8 @@ impl LlmClient for NimClient {
             prev,
             Some(response.usage.prompt_tokens),
             Some(response.usage.completion_tokens),
+            DataClass::SourceCode, // EU AI Act L2: LLM receipts see source code
+            "nim-client-v1-policy", // policy_version
             key,
         );
 

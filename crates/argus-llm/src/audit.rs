@@ -10,7 +10,7 @@
 //!
 //! See: `docs/supremum-roadmap.md` §2.1 (Article 12 compliance).
 
-use argus_core::{AuditEvent, DecisionArtifact, ToolCallRecord};
+use argus_core::{AuditEvent, DataClass, DecisionArtifact, ToolCallRecord};
 use blake3::Hasher;
 use chrono::Utc;
 use ed25519_dalek::{Signature, Signer, SigningKey};
@@ -21,6 +21,10 @@ use uuid::Uuid;
 /// # GDPR
 /// Only BLAKE3 fingerprints of `prompt_text` and `raw_response` are stored.
 /// The cleartext is hashed and dropped; it never reaches the JSON record.
+///
+/// # Article 12 Level 2 conformance
+/// `data_class` and `policy_version` are required at compile time
+/// (no defaults). Callers must consciously classify every LLM call.
 #[allow(clippy::too_many_arguments)]
 pub fn emit_audit_event(
     model_id: &str,
@@ -33,6 +37,8 @@ pub fn emit_audit_event(
     prev_hash: [u8; 32],
     input_tokens: Option<u32>,
     output_tokens: Option<u32>,
+    data_class: DataClass,
+    policy_version: &str,
     signing_key: &SigningKey,
 ) -> AuditEvent {
     // 1. Fingerprints. We hash the cleartext on the fly and never persist it.
@@ -60,6 +66,8 @@ pub fn emit_audit_event(
         input_tokens,
         output_tokens,
         estimated_cost_usd: cost,
+        data_class,
+        policy_version: policy_version.to_string(),
         decision,
         prev_hash,
         signature: Signature::from_bytes(&[0u8; 64]),
@@ -157,7 +165,7 @@ mod tests {
             prev0,
             None,
             None,
-            &key,
+            DataClass::SourceCode, "policy-v1", &key,
         );
         let prev1 = next_prev_hash(prev0, &e1);
 
@@ -172,7 +180,7 @@ mod tests {
             prev1,
             None,
             None,
-            &key,
+            DataClass::SourceCode, "policy-v1", &key,
         );
         let prev2 = next_prev_hash(prev1, &e2);
 
@@ -187,7 +195,7 @@ mod tests {
             prev2,
             None,
             None,
-            &key,
+            DataClass::SourceCode, "policy-v1", &key,
         );
         let prev3 = next_prev_hash(prev2, &e3);
 
@@ -228,7 +236,7 @@ mod tests {
             [0u8; 32],
             Some(10),
             Some(5),
-            &key,
+            DataClass::SourceCode, "policy-v1", &key,
         );
 
         // Re-canonicalize with the signature zeroed, then verify.
@@ -259,11 +267,13 @@ mod tests {
             [0u8; 32],
             None,
             None,
-            &key,
+            DataClass::SourceCode, "policy-v1", &key,
         );
         let v: Value = serde_json::to_value(&event).unwrap();
         let obj = v.as_object().unwrap();
-        assert_eq!(obj.len(), 14);
+        // 16 fields: 14 original (Roadmap 2.1) + `data_class` and
+        // `policy_version` for EU AI Act Level 2 conformance (Refs: 4).
+        assert_eq!(obj.len(), 16);
         // GDPR: the cleartext prompt (and any PII inside it) is gone.
         let s = serde_json::to_string(&event).unwrap();
         assert!(!s.contains(secret), "cleartext prompt must not appear in JSON");

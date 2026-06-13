@@ -6,7 +6,7 @@
 //! populate the `InMemoryAuditStore` directly and verify the wire
 //! shape of the NDJSON response.
 
-use argus_core::{AuditEvent, DecisionArtifact};
+use argus_core::{AuditEvent, DataClass, DecisionArtifact};
 use argus_verify::{audit_export_handler, InMemoryAuditStore};
 use axum::{
     body::to_bytes,
@@ -35,6 +35,9 @@ fn sample_event(ts: DateTime<Utc>, model: &str, idx: u8) -> AuditEvent {
         input_tokens: 10,
         output_tokens: 5,
         estimated_cost_usd: 0.0,
+        // EU AI Act Level 2 fields [Refs: 4]:
+        data_class: DataClass::SourceCode,
+        policy_version: "test-v1".to_string(),
         decision: DecisionArtifact {
             verdict: "warn".into(),
             findings_count: 1,
