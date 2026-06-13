@@ -165,6 +165,7 @@ dependencies = [
  "rand 0.8.6",
  "serde",
  "serde_json",
+ "spiffe",
  "thiserror 1.0.69",
  "uuid",
 ]
@@ -281,8 +282,10 @@ dependencies = [
  "argus-llm",
  "async-trait",
  "chrono",
+ "quote",
  "serde",
  "serde_json",
+ "syn 2.0.117",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
@@ -2439,6 +2442,15 @@ checksum = "52d1cfed4120b4d927bf7c0f86d2087a4a7d6027c906d9f9d525a80573b9be51"
 dependencies = [
  "libc",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "spiffe"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "66b316e388514701f5c8aac295909a66f72f738b8ac632814d62692309877742"
+dependencies = [
+ "thiserror 2.0.18",
 ]
 
 [[package]]

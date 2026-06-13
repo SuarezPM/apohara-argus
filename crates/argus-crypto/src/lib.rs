@@ -13,9 +13,11 @@ use thiserror::Error;
 
 pub mod chain;
 pub mod identity;
+pub mod spiffe_id;
 
 pub use chain::{HashChainError, ChainEntry, GENESIS_HASH};
 pub use identity::{SpiffeId, AgentKeypair, ARGUS_TRUST_DOMAIN, ARGUS_NAMESPACE};
+pub use spiffe_id::{SpiffeError, SpiffeIdWrapper, TrustDomain};
 
 #[derive(Error, Debug)]
 pub enum CryptoError {

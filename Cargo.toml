@@ -17,7 +17,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.88"
 license = "MIT"
 authors = ["Apohara <apohara.dev>"]
 description = "ARGUS — AI slop defense layer for the AI-generated code era"
@@ -55,6 +55,10 @@ clap = { version = "4", features = ["derive", "env"] }
 # Crypto
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 blake3 = "1"
+# SPIFFE identity (v0.16, MSRV 1.88) — spec-conformant SpiffeId + TrustDomain.
+# Default features (empty) gives us the core types; feature-gate JWT/Workload-API
+# on later items (8.3+) when we actually mint JWT-SVIDs.
+spiffe = "0.16"
 
 # Util
 anyhow = "1"
@@ -71,6 +75,13 @@ rand = "0.8"
 
 # Markdown parsing (para los prompts .md)
 pulldown-cmark = "0.10"
+
+# Syn AST (for argus-slop deterministic pre-flight analyzer, item 5.1).
+# `visit` powers recursive AST walks; `full` enables every node type
+# (Item, Expr, Stmt, Pat, etc.) so we can match function bodies deeply.
+# `extra-traits` gives Eq/Hash on AST nodes for free.
+syn = { version = "2", features = ["full", "visit", "extra-traits"] }
+quote = "1"
 
 # Plotting (slop radar SVG generation, fallback si no hay DALL-E)
 plotters = "0.3"

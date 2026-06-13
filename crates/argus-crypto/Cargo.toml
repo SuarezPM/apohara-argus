@@ -17,6 +17,7 @@ thiserror = { workspace = true }
 base64 = "0.22"
 hex = "0.4"
 uuid = { workspace = true }
+spiffe = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
