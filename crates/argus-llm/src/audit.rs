@@ -46,8 +46,8 @@ pub fn emit_audit_event(
     let response_fingerprint = blake3_bytes(raw_response.as_bytes());
 
     // 2. Tokens. Prefer provider-reported counts; fall back to chars/4.
-    let input_tokens = input_tokens.unwrap_or_else(|| (prompt_text.len() / 4) as u32);
-    let output_tokens = output_tokens.unwrap_or_else(|| (raw_response.len() / 4) as u32);
+    let input_tokens = input_tokens.unwrap_or((prompt_text.len() / 4) as u32);
+    let output_tokens = output_tokens.unwrap_or((raw_response.len() / 4) as u32);
 
     // 3. Cost. Static pricing table; free tier defaults to $0.
     let cost = estimate_cost(model_id, input_tokens, output_tokens);

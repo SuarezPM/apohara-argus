@@ -11,7 +11,6 @@
 //! Why opt-in (not opt-out): on Fly.io free tier every cycle counts.
 //! When a user has no collector, the JSON spans just add to log volume.
 
-use opentelemetry::trace::Tracer;
 use opentelemetry::trace::TracerProvider as _;
 use opentelemetry::KeyValue;
 use opentelemetry_sdk::trace::{Config as SdkTraceConfig, TracerProvider};
@@ -46,6 +45,7 @@ pub fn is_disabled() -> bool {
 ///
 /// Safe to call multiple times — subsequent calls are no-ops (the
 /// tracing subscriber is global state and we use `try_init`).
+#[allow(deprecated)] // SdkTraceConfig::with_resource — full Builder migration tracked separately.
 pub fn init(service_label: &str) -> Option<TelemetryGuard> {
     if is_disabled() {
         return None;

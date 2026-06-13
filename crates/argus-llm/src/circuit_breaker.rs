@@ -245,11 +245,7 @@ mod tests {
 
         tokio::time::sleep(Duration::from_millis(60)).await;
         let r = breaker.call(req(), "k").await;
-        assert!(
-            matches!(r, Ok(_)),
-            "probe in HalfOpen should pass through: {:?}",
-            r
-        );
+        assert!(r.is_ok(), "probe in HalfOpen should pass through: {:?}", r);
         assert_eq!(breaker.state().await, CircuitState::Closed);
         assert_eq!(*breaker.consecutive_failures.lock().await, 0);
 
