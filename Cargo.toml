@@ -80,7 +80,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 opentelemetry = "0.27"
 opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
 opentelemetry-stdout = { version = "0.27", features = ["trace"] }
-tracing-opentelemetry = "0.28"
+tracing-opentelemetry = "0.33"
 
 # MCP (Model Context Protocol) — official Rust SDK.
 # [Refs: 5] Exposes ARGUS's 4 specialists as MCP tools to Claude Code /
