@@ -1,0 +1,62 @@
+name: Bench
+
+# Bench workflow: runs the 3 `harness = false` benches in the 14th
+# crate (argus-benchmarks) on every PR and push to main. The job is
+# INFORMATIONAL — a red bench does NOT block the merge. It surfaces
+# precision/recall, latency, and cost regressions as a workflow
+# artifact (target/precision_recall.json) and a log dump.
+#
+# Source-of-truth bench file: crates/argus-benchmarks/benches/
+# Source-of-truth dataset:    crates/argus-benchmarks/data/
+# Published numbers:          docs/BENCHMARK.md
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Read-only by default; the bench job does not widen.
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  bench:
+    name: argus-benchmarks (precision_recall, latency, cost)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2.7.4
+
+      # The 3 benches are plain binaries (harness = false). Build
+      # them once, then run each one. The precision_recall bench
+      # writes target/precision_recall.json which we upload as the
+      # primary artifact.
+      - name: Build benches
+        run: cargo build --release --benches -p argus-benchmarks
+
+      - name: precision_recall (P/R/F1 over the 40-PR dataset)
+        run: ./target/release/deps/precision_recall-*
+
+      - name: latency (p50/p99 end-to-end diff -> verdict)
+        run: ./target/release/deps/latency-*
+
+      - name: cost (tokens + estimated USD per verdict)
+        run: ./target/release/deps/cost-*
+
+      - name: Upload precision_recall.json
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: precision-recall-json
+          path: target/precision_recall.json
+          if-no-files-found: warn
+          retention-days: 30

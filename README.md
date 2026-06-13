@@ -15,6 +15,7 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/XXXXX/badge)](https://www.bestpractices.dev/projects/XXXXX)
 [Security](SECURITY.md)
 [Branch protection](docs/branch-protection.md)
+[Benchmarks](docs/BENCHMARK.md)
 
 ---
 
