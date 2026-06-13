@@ -10,7 +10,7 @@
 //! If a GitHub token is configured, the worker will also post a comment
 //! and set a label on the PR.
 
-use argus_core::{ArgusError, DecisionArtifact, PRReview, Verdict, VerdictStatus, RiskScore};
+use argus_core::{ArgusError, DecisionArtifact, FixPlan, PRReview, Verdict, VerdictStatus, RiskScore};
 use argus_crypto::chain::append;
 use argus_crypto::identity::AgentKeypair;
 use argus_github::GitHubClient;
@@ -54,6 +54,10 @@ pub struct AnalyzeResponse {
     pub review: PRReview,
     pub comment_posted: bool,
     pub labels_set: bool,
+    /// Structured handoff for downstream coding agents (Claude Code /
+    /// Codex / Cursor / Devin). Sorted high-severity first. See
+    /// `argus_core::FixPlan` for the JSON shape. [Refs: 1.2]
+    pub fix_plan: FixPlan,
 }
 
 pub struct VerifyWorker {
@@ -273,6 +277,10 @@ impl VerifyWorker {
         // sole writer in normal operation.
         self.audit_store.append(audit_event).await;
 
+        // Build the hand-off plan BEFORE moving `review` into the
+        // response struct — `from_findings` borrows `review.findings`.
+        let fix_plan = FixPlan::from_findings(&review.findings);
+
         Ok(AnalyzeResponse {
             pr_ref,
             verdict: out.verdict,
@@ -282,6 +290,7 @@ impl VerifyWorker {
             review,
             comment_posted,
             labels_set,
+            fix_plan,
         })
     }
 }

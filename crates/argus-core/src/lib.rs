@@ -18,6 +18,7 @@ pub use types::{
     PRReview, AgentAction, AgentRole, LedgerEntry, LedgerEntryKind,
     OrgSummary, WeeklyBriefing, OffenderSummary, TeamSummary,
     AuditEvent, DecisionArtifact, ToolCallRecord, Manifest,
+    FixPlan, FixStep, FixStepKind,
 };
 pub use prompts::{Prompt, PromptLibrary, PromptMetadata};
 pub use config::Config;

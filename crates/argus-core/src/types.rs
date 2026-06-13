@@ -324,6 +324,221 @@ pub struct Manifest {
     pub generated_at: DateTime<Utc>,
 }
 
+// =====================================================================
+// Agent hand-off — `fix_plan.json` [Refs: 1.2]
+//
+// Output of Aegis Verify that downstream coding agents (Claude Code,
+// Codex, Cursor, Devin) can ingest as a structured task list. The
+// JSON shape is intentionally minimal: each step is `(file, kind,
+// description, suggested_code)`, which is what the four popular
+// handoff consumers expect (Greptile's `fix_plan.json`, PR-Agent's
+// `--review`, etc.).
+// =====================================================================
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum FixStepKind {
+    /// Add a missing import (e.g., hallucinated crate path).
+    AddImport,
+    /// Add a test case for an under-covered branch.
+    AddTest,
+    /// Refactor / replace a function or block.
+    ModifyFunction,
+    /// Remove dead code, unused vars, swallowed `Err` arms, etc.
+    RemoveCode,
+    /// Add a doc comment or a `// SAFETY:` / `// TODO:` annotation.
+    AddDocumentation,
+    /// Patch a security-relevant finding (CWE reference, etc.).
+    SecurityPatch,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FixStep {
+    pub kind: FixStepKind,
+    /// Path relative to the repo root, e.g. `"src/api/handlers.rs"`.
+    pub file: String,
+    /// Inclusive `[start, end]` line range, when known. `None` means
+    /// "the file as a whole" (e.g., "remove this unused dependency").
+    pub line_range: Option<(u32, u32)>,
+    /// One-sentence human-readable description of what to do.
+    pub description: String,
+    /// Optional drop-in code suggestion. The downstream agent can
+    /// apply it verbatim, ignore it, or use it as a starting point.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suggested_code: Option<String>,
+    /// Severity of the underlying finding — drives priority order.
+    pub severity: FindingSeverity,
+    /// Free-form category tag from the analyzer (e.g., `"swallowed_err"`,
+    /// `"unhandled_credential"`, `"oversized_fn"`). Useful for filtering.
+    pub category: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct FixPlan {
+    /// Steps sorted high-severity-first (Critical → Info).
+    pub steps: Vec<FixStep>,
+    /// Total step count, redundant with `steps.len()` for downstream
+    /// consumers that prefer a scalar.
+    pub total_steps: u32,
+    /// Counts by severity. Empty if no findings.
+    pub by_severity: std::collections::BTreeMap<String, u32>,
+}
+
+impl FixPlan {
+    /// Empty plan (no findings).
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    /// Build a plan from a list of findings, sorted by severity
+    /// (Critical first, Info last). Stable order: same-severity
+    /// findings keep their original order.
+    pub fn from_findings(findings: &[PRFinding]) -> Self {
+        let mut steps: Vec<FixStep> = findings.iter().map(finding_to_step).collect();
+        // Sort: highest severity first. FindingSeverity derives Ord
+        // (Info=lowest, Critical=highest) so reverse works.
+        steps.sort_by(|a, b| b.severity.cmp(&a.severity));
+
+        let mut by_severity: std::collections::BTreeMap<String, u32> =
+            std::collections::BTreeMap::new();
+        for s in &steps {
+            *by_severity.entry(severity_label(s.severity).to_string()).or_insert(0) += 1;
+        }
+
+        Self {
+            total_steps: steps.len() as u32,
+            steps,
+            by_severity,
+        }
+    }
+}
+
+fn severity_label(s: FindingSeverity) -> &'static str {
+    match s {
+        FindingSeverity::Critical => "critical",
+        FindingSeverity::High => "high",
+        FindingSeverity::Medium => "medium",
+        FindingSeverity::Low => "low",
+        FindingSeverity::Info => "info",
+    }
+}
+
+/// Map a PRFinding to a FixStep. The mapping is intentionally
+/// conservative — we pick the most likely `kind` from the analyzer
+/// category string, fall back to a generic description, and let the
+/// downstream agent decide.
+fn finding_to_step(f: &PRFinding) -> FixStep {
+    let kind = match f.category.as_str() {
+        "unhandled_credential" | "security" | "injection" | "unsafe_panic" => FixStepKind::SecurityPatch,
+        "missing_test" | "untested_branch" | "test_coverage" => FixStepKind::AddTest,
+        "dead_code" | "swallowed_err" | "unwrap" | "expect" => FixStepKind::RemoveCode,
+        "oversized_fn" | "complexity" | "refactor" => FixStepKind::ModifyFunction,
+        "doc" | "missing_doc" | "comment" => FixStepKind::AddDocumentation,
+        "missing_import" | "import" | "use" => FixStepKind::AddImport,
+        _ => FixStepKind::ModifyFunction,
+    };
+    let line_range = f.line.map(|l| (l, l));
+    FixStep {
+        kind,
+        file: f.file.clone(),
+        line_range,
+        description: f
+            .recommendation
+            .clone()
+            .unwrap_or_else(|| f.description.clone()),
+        suggested_code: f.quote.clone(),
+        severity: f.severity,
+        category: f.category.clone(),
+    }
+}
+
+#[cfg(test)]
+mod fix_plan_tests {
+    use super::*;
+    use chrono::Utc;
+
+    fn finding(severity: FindingSeverity, category: &str, file: &str, line: Option<u32>) -> PRFinding {
+        PRFinding {
+            id: Uuid::new_v4(),
+            agent: AgentRole::AegisSlop,
+            severity,
+            file: file.to_string(),
+            line,
+            category: category.to_string(),
+            description: format!("{} finding", category),
+            quote: None,
+            recommendation: Some(format!("Fix {}", category)),
+            created_at: Utc::now(),
+        }
+    }
+
+    #[test]
+    fn empty_plan_has_zero_steps() {
+        let p = FixPlan::empty();
+        assert_eq!(p.total_steps, 0);
+        assert!(p.steps.is_empty());
+        assert!(p.by_severity.is_empty());
+    }
+
+    #[test]
+    fn from_findings_sorts_critical_first() {
+        let findings = vec![
+            finding(FindingSeverity::Info, "doc", "src/lib.rs", Some(1)),
+            finding(FindingSeverity::Critical, "security", "src/api.rs", Some(42)),
+            finding(FindingSeverity::Medium, "test", "src/foo.rs", Some(10)),
+        ];
+        let plan = FixPlan::from_findings(&findings);
+        assert_eq!(plan.total_steps, 3);
+        assert_eq!(plan.steps[0].severity, FindingSeverity::Critical);
+        assert_eq!(plan.steps[1].severity, FindingSeverity::Medium);
+        assert_eq!(plan.steps[2].severity, FindingSeverity::Info);
+    }
+
+    #[test]
+    fn from_findings_counts_by_severity() {
+        let findings = vec![
+            finding(FindingSeverity::High, "x", "a.rs", Some(1)),
+            finding(FindingSeverity::High, "x", "b.rs", Some(2)),
+            finding(FindingSeverity::Low, "x", "c.rs", Some(3)),
+        ];
+        let plan = FixPlan::from_findings(&findings);
+        assert_eq!(plan.by_severity.get("high"), Some(&2));
+        assert_eq!(plan.by_severity.get("low"), Some(&1));
+        assert_eq!(plan.by_severity.get("medium"), None);
+    }
+
+    #[test]
+    fn json_roundtrip_preserves_all_fields() {
+        let findings = vec![finding(FindingSeverity::Critical, "security", "src/auth.rs", Some(99))];
+        let plan = FixPlan::from_findings(&findings);
+        let json = serde_json::to_string(&plan).unwrap();
+        let back: FixPlan = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.total_steps, 1);
+        assert_eq!(back.steps.len(), 1);
+        assert_eq!(back.steps[0].file, "src/auth.rs");
+        assert_eq!(back.steps[0].line_range, Some((99, 99)));
+        assert_eq!(back.steps[0].kind, FixStepKind::SecurityPatch);
+    }
+
+    #[test]
+    fn category_to_kind_mapping() {
+        // Sanity-check the category→kind mapping used by finding_to_step
+        let cases: &[(&str, FixStepKind)] = &[
+            ("security", FixStepKind::SecurityPatch),
+            ("missing_test", FixStepKind::AddTest),
+            ("swallowed_err", FixStepKind::RemoveCode),
+            ("oversized_fn", FixStepKind::ModifyFunction),
+            ("missing_doc", FixStepKind::AddDocumentation),
+            ("missing_import", FixStepKind::AddImport),
+        ];
+        for (cat, expected) in cases {
+            let f = finding(FindingSeverity::Medium, cat, "x.rs", Some(1));
+            let step = finding_to_step(&f);
+            assert_eq!(step.kind, *expected, "category={cat}");
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
