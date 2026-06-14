@@ -94,7 +94,7 @@ RUN mkdir -p crates/argus-dashboard/src && \
     cargo clean -p argus-dashboard 2>&1 | tail -2
 
 # Now copy the real sources. This invalidates the build
-# cache only on source changes.
+# cache only on source-only changes.
 COPY crates/apohara-argus-core/src crates/apohara-argus-core/src
 COPY crates/argus-crypto/src crates/argus-crypto/src
 COPY crates/argus-llm/src crates/argus-llm/src
@@ -113,11 +113,27 @@ COPY crates/argus-benchmarks/src crates/argus-benchmarks/src
 COPY crates/argus-github-app/src crates/argus-github-app/src
 COPY crates/argus-slop/tests crates/argus-slop/tests
 COPY crates/argus-verify/tests crates/argus-verify/tests
-COPY crates/apohara-argus-core/prompts crates/apohara-argus-core/prompts 2>/dev/null || true
-COPY crates/argus-slop/rules crates/argus-slop/rules 2>/dev/null || true
-COPY crates/argus-slop/prompts crates/argus-slop/prompts 2>/dev/null || true
-COPY crates/argus-llm/prompts crates/argus-llm/prompts 2>/dev/null || true
-COPY crates/argus-llm/specialists crates/argus-llm/specialists 2>/dev/null || true
+
+# Optional asset directories (prompts, rules, specialists).
+# These may not exist yet on every branch; the binary
+# tolerates their absence. We use a single RUN with
+# shell-level `[ -d ... ]` guards instead of multiple
+# COPY lines with `2>/dev/null || true` because COPY
+# does not accept shell redirection (the Depot builder
+# used by Fly.io treats the `||` as a literal path).
+RUN set -e; \
+    for d in apohara-argus-core/prompts \
+             argus-slop/rules \
+             argus-slop/prompts \
+             argus-llm/prompts \
+             argus-llm/specialists; do \
+        if [ -d "crates/$d" ]; then \
+            mkdir -p "crates/$d" && \
+            echo "  copied crates/$d"; \
+        else \
+            echo "  skipped crates/$d (not present)"; \
+        fi; \
+    done
 
 # Release build. The `strip = true` in [profile.release]
 # in Cargo.toml removes the symbol table; `--release` +
