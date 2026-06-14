@@ -12,6 +12,7 @@
 ![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)
 ![Tests 145+](https://img.shields.io/badge/tests-145%2B%20passing-brightgreen)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/SuarezPM/apohara-argus/badge)](https://scorecard.dev/viewer/?uri=github.com/SuarezPM/apohara-argus)
+<!-- OpenSSF Best Practices badge: replace XXXXX with the project ID from bestpractices.dev/en/criteria/1 (V.4). See docs/best-practices-silver.md. -->
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/XXXXX/badge)](https://www.bestpractices.dev/projects/XXXXX)
 [Install](#install)
 [Security](SECURITY.md)

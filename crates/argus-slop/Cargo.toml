@@ -6,9 +6,9 @@ license.workspace = true
 authors.workspace = true
 description = "ARGUS crate: argus-slop — the 4 analyzers (slop/security/arch/verdict)"
 repository.workspace = true
-# Internal library — not published to crates.io. The deterministic
-# regex + LLM analyzer pipeline is exposed via the public surfaces
-# (CLI / guard / verify / lens / dashboard), not as a standalone crate.
+# Published to crates.io as a public library. The deterministic regex
+# + LLM analyzer pipeline (slop, security, architecture, verdict) is
+# used by the 7 user-facing argus crates.
 [dependencies]
 apohara-argus-core = { workspace = true }
 argus-llm = { workspace = true }

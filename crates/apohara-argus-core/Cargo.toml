@@ -6,9 +6,10 @@ license.workspace = true
 authors.workspace = true
 description = "ARGUS crate: apohara-argus-core — types, errors, prompts, config"
 repository.workspace = true
-# Internal library — not published to crates.io. Surface to users goes
-# through the `apohara-argus-cli` / `argus-guard` / `argus-verify` / `argus-lens`
-# / `argus-dashboard` / `argus-llm` / `apohara-argus-mcp` public crates.
+# Published to crates.io as a public library. Provides shared types,
+# errors, prompts, and config used by the 7 user-facing argus crates
+# (apohara-argus-cli, argus-guard, argus-verify, argus-lens,
+# argus-dashboard, argus-llm, apohara-argus-mcp).
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }

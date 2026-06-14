@@ -6,9 +6,10 @@ license.workspace = true
 authors.workspace = true
 description = "ARGUS crate: argus-crypto — ed25519 signing, BLAKE3 hash chain, SPIFFE-like IDs"
 repository.workspace = true
-# Internal library — not published to crates.io. The BLAKE3 + Ed25519
-# audit chain is private to ARGUS; consumers depend on the public CLI
-# / server surfaces, not the cryptographic primitives directly.
+# Published to crates.io as a public library. Exposes the BLAKE3 +
+# Ed25519 audit chain primitives (with SPIFFE-like IDs) used by the
+# 7 user-facing argus crates; also lets external integrations verify
+# the audit chain directly.
 [dependencies]
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 blake3 = "1"
