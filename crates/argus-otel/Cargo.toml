@@ -9,8 +9,6 @@ repository.workspace = true
 # Internal library — not published to crates.io. The OpenTelemetry
 # stdout exporter is wired into the runtime crates as an opt-in
 # feature; it is not a standalone public surface.
-publish = false
-
 [dependencies]
 opentelemetry = { workspace = true }
 opentelemetry_sdk = { workspace = true }

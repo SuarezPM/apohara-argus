@@ -9,8 +9,6 @@ repository.workspace = true
 # Internal library — not published to crates.io. The deterministic
 # regex + LLM analyzer pipeline is exposed via the public surfaces
 # (CLI / guard / verify / lens / dashboard), not as a standalone crate.
-publish = false
-
 [dependencies]
 apohara-argus-core = { workspace = true }
 argus-llm = { workspace = true }
