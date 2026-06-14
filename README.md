@@ -1,8 +1,8 @@
-# 🛡️ ARGUS — The verification layer for AI-generated code
+# 🛡️ ARGUS -- The verification layer for AI-generated code
 
-> **AI generates code at near-zero cost. Human review didn't get faster. The bottleneck inverted: it's no longer generation — it's verification.**
+> **AI generates code at near-zero cost. Human review didn't get faster. The bottleneck inverted: it's no longer generation -- it's verification.**
 >
-> ARGUS is the verification infrastructure. **15 Rust crates, 4 specialists, an audit chain that's BLAKE3-hash-chained and Ed25519-signed — EU AI Act Art. 12 Level 2 ready by default.** MIT licensed. BYOK. Zero SaaS lock-in.
+> ARGUS is the verification infrastructure. **15 Rust crates, 4 specialists, an audit chain that's BLAKE3-hash-chained and Ed25519-signed -- EU AI Act Art. 12 Level 2 ready by default.** MIT licensed. BYOK. Zero SaaS lock-in.
 
 [![aislop score](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/SuarezPM/apohara-argus/main/aislop-score.json)](https://github.com/SuarezPM/apohara-argus/actions/workflows/aislop.yml)
 ![Rust 100%](https://img.shields.io/badge/rust-100%25-orange?logo=rust)
@@ -19,7 +19,7 @@
 
 ## The problem is here. Now.
 
-**Open Source is dying in 2026.** La confianza comunitaria se ahoga ante un +206% de scripts de Bash en proyectos AI¹, revisiones de PRs **4.6× más lentas**² y **15–18% más de vulnerabilidades**². Con **42% del código commiteado hoy siendo AI-generated o AI-assisted**³ y el **96% de los devs desconfiando de él**³, el AI slop — *Palabra del Año 2025*⁴ — ha forzado medidas extremas:
+**Open Source is dying in 2026.** La confianza comunitaria se ahoga ante un +206% de scripts de Bash en proyectos AI¹, revisiones de PRs **4.6× más lentas**² y **15-18% más de vulnerabilidades**². Con **42% del código commiteado hoy siendo AI-generated o AI-assisted**³ y el **96% de los devs desconfiando de él**³, el AI slop -- *Palabra del Año 2025*⁴ -- ha forzado medidas extremas:
 
 | Project | Response | Date |
 |---|---|---|
@@ -36,11 +36,11 @@
 
 ## 💡 What ARGUS is
 
-ARGUS = **AI Review & Governance for Undermining Slop** — the trust layer for AI-generated code.
+ARGUS = **AI Review & Governance for Undermining Slop** -- the trust layer for AI-generated code.
 
 **One product. Three layers. Four specialists. One signed certificate per analysis.**
 
-Built for **engineering managers, OSS maintainers, and CISOs** who need an audit-grade, EU AI Act–ready answer to the verification bottleneck. Pure Rust (15 crates, zero Python, zero Node.js in production). BYOK (your NVIDIA NIM key, never persisted). MIT licensed.
+Built for **engineering managers, OSS maintainers, and CISOs** who need an audit-grade, EU AI Act-ready answer to the verification bottleneck. Pure Rust (15 crates, zero Python, zero Node.js in production). BYOK (your NVIDIA NIM key, never persisted). MIT licensed.
 
 ---
 
@@ -49,8 +49,8 @@ Built for **engineering managers, OSS maintainers, and CISOs** who need an audit
 | Worker | When it runs | What it does | Latency |
 |---|---|---|---|
 | **Aegis Guard** | Pre-commit / pre-push | Hybrid scan on the staged diff: deterministic AST pre-flight (5 SLOP rules, regex, <100ms) + LLM semantic. Blocks critical issues. | <2s |
-| **Aegis Verify** | PR review (webhook or one-shot) | 4 specialists in parallel via Tokio `join!` + **CordonEnforcer** (synthesizer never sees raw code). Emits a `fix_plan.json` for downstream coding agents. | 4–8s |
-| **Aegis Lens** | Weekly digest | Aggregates findings across an org, ranks top offenders, generates an executive briefing (text + optional HeyGen video). | 5–15s |
+| **Aegis Verify** | PR review (webhook or one-shot) | 4 specialists in parallel via Tokio `join!` + **CordonEnforcer** (synthesizer never sees raw code). Emits a `fix_plan.json` for downstream coding agents. | 4-8s |
+| **Aegis Lens** | Weekly digest | Aggregates findings across an org, ranks top offenders, generates an executive briefing (text + optional HeyGen video). | 5-15s |
 
 ---
 
@@ -69,7 +69,7 @@ Built for **engineering managers, OSS maintainers, and CISOs** who need an audit
 
 ## ✨ The 7 things that make ARGUS different
 
-### 1. Hybrid detection — cheap + deep
+### 1. Hybrid detection -- cheap + deep
 
 ```
 SLOP-001 oversized fn (size)         ─► regex  < 1ms     catches 40-60% of slop
@@ -101,7 +101,7 @@ The 16-field `AuditEvent` is automatically emitted on every LLM call:
 }
 ```
 
-Verifiable: `curl /audit/export?from=2026-01-01&to=2026-12-31` returns NDJSON with a BLAKE3 manifest footer. **No cleartext prompts, ever.** GDPR derivative-liability-safe by construction. Enforcement starts **Aug 2, 2026** — 51 days from this README.
+Verifiable: `curl /audit/export?from=2026-01-01&to=2026-12-31` returns NDJSON with a BLAKE3 manifest footer. **No cleartext prompts, ever.** GDPR derivative-liability-safe by construction. Enforcement starts **Aug 2, 2026** -- 51 days from this README.
 
 ### 3. MCP server for Claude Code / Codex / Cursor
 
@@ -123,9 +123,9 @@ Four tools land in your agent's toolbox:
 - `aegis_arch` → architectural fit score
 - `aegis_verdict` → final verdict + FixPlan
 
-Your coding agent now has ARGUS on tap. It can run a slop check, a security check, and a verdict on its own draft PR — **automatically, before it ever asks for human review**.
+Your coding agent now has ARGUS on tap. It can run a slop check, a security check, and a verdict on its own draft PR -- **automatically, before it ever asks for human review**.
 
-### 4. A2A AgentCards — discoverable to Google's open protocol
+### 4. A2A AgentCards -- discoverable to Google's open protocol
 
 ```
 GET /.well-known/agent-card.json
@@ -134,11 +134,11 @@ GET /a2a/message
 
 Opt-in via `ARGUS_A2A_DISABLED=false`. Google A2A orchestrators can discover and message our 4 specialists.
 
-### 5. BYOK economics — $0.05/dev/month
+### 5. BYOK economics -- $0.05/dev/month
 
 - User provides the NVIDIA NIM key (`X-LLM-Key` header or `ARGUS_NIM_KEY` env)
 - No telemetry, no tracking, no per-seat fees
-- We don't see your diffs — they go directly from your process to NIM
+- We don't see your diffs -- they go directly from your process to NIM
 - 100× cheaper than CodeRabbit ($0.10-0.50/PR) at scale
 
 ### 6. Production resilience out of the box
@@ -168,7 +168,7 @@ Opt-in via `ARGUS_A2A_DISABLED=false`. Google A2A orchestrators can discover and
                                         │
                                         ▼
         ┌───────────────────────────────────────────────────────────────┐
-        │                       ARGUS — Three Layers                    │
+        │                       ARGUS -- Three Layers                    │
         │                                                               │
         │   Aegis Guard       Aegis Verify       Aegis Lens            │
         │   (pre-commit)  ──► (PR review)   ──► (weekly digest)       │
@@ -180,7 +180,7 @@ Opt-in via `ARGUS_A2A_DISABLED=false`. Google A2A orchestrators can discover and
         │                   │                                            │
         │                   ▼                                            │
         │   ┌───────────────────────────────────────────────────┐       │
-        │   │  AuditEvent (16 fields) — EU AI Act L2 ready      │       │
+        │   │  AuditEvent (16 fields) -- EU AI Act L2 ready      │       │
         │   │  BLAKE3 chain + Ed25519 signature + BLAKE3 NDJSON  │       │
         │   │  manifest at /audit/export                          │       │
         │   └───────────────────────────────────────────────────┘       │
@@ -312,15 +312,15 @@ Numbers we **measured** ([BENCHMARK.md](docs/BENCHMARK.md)), not promised:
 
 ### For the **CISO** 👔
 
-EU AI Act Art. 12 compliance is **one `curl`**, not a 6-month audit. The audit chain is **BLAKE3-hash-chained and Ed25519-signed** — your regulator can verify it offline without trusting ARGUS. **BYOK + offline-first** means your code never leaves your host. No data residency issue. See [docs/for-ciso.md](docs/for-ciso.md) for the full pitch.
+EU AI Act Art. 12 compliance is **one `curl`**, not a 6-month audit. The audit chain is **BLAKE3-hash-chained and Ed25519-signed** -- your regulator can verify it offline without trusting ARGUS. **BYOK + offline-first** means your code never leaves your host. No data residency issue. See [docs/for-ciso.md](docs/for-ciso.md) for the full pitch.
 
 ### For the **engineering manager** 📊
 
 ARGUS pays for itself in week 1 of any team > 3 developers:
 
-- **Per dev:** 25–40 min/PR saved in review (only edit the bot's draft) + ~15 min/week avoided in re-work
-- **Per team of 10 devs:** 4–7 hrs/week in maintainer time + 5–10 AI slop bugs prevented/month
-- **Per engineering manager:** 4–6 hrs/week in manual reporting → 0 with Aegis Lens
+- **Per dev:** 25-40 min/PR saved in review (only edit the bot's draft) + ~15 min/week avoided in re-work
+- **Per team of 10 devs:** 4-7 hrs/week in maintainer time + 5-10 AI slop bugs prevented/month
+- **Per engineering manager:** 4-6 hrs/week in manual reporting → 0 with Aegis Lens
 
 ### For the **OSS maintainer** 🛠️
 
@@ -352,12 +352,12 @@ The 19 features shipped (1 of 20 deliberately not done):
 | 6.4 | SQLite audit persistence | ✅ Shipped (sqlx 0.7) |
 | 7.1 | HeyGen deeplink | ✅ Shipped (url_encode, 0% cost) |
 | 8.2 | SPIFFE primitives | ✅ Shipped (spiffe 0.16) |
-| **7.2** | **BYVK opt-in** (HeyGen/D-ID video integration) | **⛔ Deliberately not done** — the $78-460/yr cost kills the $0.05/dev/month story. 7.1 (deeplink) gives 80% of the value at 0% of the cost. |
+| **7.2** | **BYVK opt-in** (HeyGen/D-ID video integration) | **⛔ Deliberately not done** -- the $78-460/yr cost kills the $0.05/dev/month story. 7.1 (deeplink) gives 80% of the value at 0% of the cost. |
 
 ### What's next (human-action items)
 
-- 🔓 **crates.io publishing** — 13 crates ready; awaiting `CARGO_REGISTRY_TOKEN` repo secret
-- 🔓 **OpenSSF Best Practices Silver** — evidence map ready at `docs/best-practices-silver.md`; awaiting form submission at `bestpractices.dev`
+- 🔓 **crates.io publishing** -- 13 crates ready; awaiting `CARGO_REGISTRY_TOKEN` repo secret
+- 🔓 **OpenSSF Best Practices Silver** -- evidence map ready at `docs/best-practices-silver.md`; awaiting form submission at `bestpractices.dev`
 - 🔓 **First release on GitHub** with SLSA L3 attestation, SHA256 manifest, and distroless Docker image
 
 ---
