@@ -1,0 +1,90 @@
+# fly.toml — one-click deploy config for the ARGUS dashboard.
+#
+# Deploys the SSR landing page + live demo (Askama + htmx,
+# no JS build step) to argus.apohara.dev via the
+# argus-dashboard Fly app.
+#
+# Usage (one-time, ~5 minutes total):
+#   1. Install the fly CLI: https://fly.io/docs/hands-on/install-flyctl/
+#   2. Sign in: fly auth signup (or `fly auth login`)
+#   3. `cd crates/argus-dashboard`
+#   4. `fly launch --copy-config --no-deploy`
+#      (this provisions the `argus-dashboard` app in `iad`
+#      and asks the first-time setup questions; --no-deploy
+#      skips the initial build since fly.toml drives it.)
+#   5. (Optional) Set the LLM BYOK secret for live NIM calls:
+#        fly secrets set ARGUS_NIM_KEY=nvapi-...
+#      Without this, the dashboard runs in demo mode
+#      (ARGUS_DEMO_MODE=true) and returns the pre-computed
+#      verdict from static/demo-result.json.
+#   6. `fly deploy`  — builds the multi-arch image and
+#      releases it to `argus-dashboard.fly.dev`.
+#   7. Add the custom domain (see DEPLOY.md § Custom domain):
+#        fly certs add argus.apohara.dev
+#      and follow the DNS instructions Fly prints.
+#   8. Verify: `fly open` (lands on https://argus.apohara.dev).
+#
+# Free tier eligible (256 MB RAM, 1 shared CPU, auto-stop
+# when idle). The `min_machines_running = 0` line is what
+# keeps the dashboard free — Fly cold-starts on the first
+# request after a quiet window (typically < 5s).
+
+# See https://fly.io/docs/reference/configuration/ for more options.
+app = "argus-dashboard"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  # Fly sets PORT=8080 by convention; we set it explicitly
+  # so a misconfigured env doesn't sneak a different port
+  # in. The binary reads ARGUS_DASHBOARD_PORT at startup
+  # (defaults to 3000 if unset), so we mirror PORT there.
+  PORT = "8080"
+  ARGUS_DASHBOARD_PORT = "8080"
+  # Demo mode: returns pre-computed verdict from
+  # static/demo-result.json. Powers the landing-page
+  # live demo panel without needing ARGUS_NIM_KEY.
+  # Set to "false" to enable real NIM-backed analysis
+  # (requires ARGUS_NIM_KEY as a Fly secret).
+  ARGUS_DEMO_MODE = "true"
+  # Default NIM model (overridable per-request via /submit).
+  ARGUS_NIM_MODEL = "meta/llama-3.1-70b-instruct"
+  # Verbose logs for argus; everything else at info.
+  RUST_LOG = "info,argus=debug"
+
+[http_service]
+  internal_port = 8080
+  # `force_https = true` terminates TLS at Fly's edge so the
+  # binary can stay on plain HTTP. The `auto_stop` +
+  # `auto_start` combination is what makes the dashboard
+  # free-tier friendly: Fly spins the machine down when
+  # there are no requests, and spins it back up on the
+  # next visitor.
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  # Health check on /api/health. The handler returns
+  # `{"status": "ok", "service": "argus", "version": "..."}`.
+  # Fly hits this every 15s; if it 200s, the machine stays
+  # up; if it 5xx's 3x in a row, Fly restarts.
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "2s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/api/health"
+
+[[vm]]
+  # Free tier: 256 MB RAM, 1 shared CPU. Cold-start
+  # penalty (~3-5s) is acceptable for a marketing page
+  # because visitors tolerate one or two seconds of
+  # latency on first load.
+  size = "shared-cpu-1x"
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1

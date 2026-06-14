@@ -1,0 +1,450 @@
+[
+  {
+    "id": "curl-2025-12-hallucinated-vuln",
+    "project": "curl",
+    "pr_url": "https://github.com/curl/curl/pull/12480",
+    "title": "Buffer overflow in Curl_urldecode()",
+    "language": "C",
+    "diff_excerpt": "static CURLcode Curl_urldecode(const char *url, char **out, size_t *outlen) {\n  /* TODO: refactor into smaller helpers */\n  // This function does X.\n  // We need to handle unicode here.\n  char *buf = malloc(strlen(url) * 8);\n  // NOTE: fix size calc later\n  size_t i = 0;\n  while (*url) { ... }\n  *out = buf;\n  *outlen = i;\n  return CURLE_OK;\n}",
+    "source": "Inspired by Daniel Stenberg's 'Death by a thousand slops' blog post (Dec 2025): 19 of 20 bug-bounty reports to curl were AI hallucinations",
+    "verdict": "Halted",
+    "risk_score": 0.92,
+    "slop_score": 0.45,
+    "fit_score": 0.3,
+    "security_summary": "CRITICAL: Hallucinated vulnerability. Function Curl_urldecode() does not exist in current curl codebase. The proposed buffer arithmetic is safe and the suggested overflow does not reproduce. CordonEnforcer isolates this finding from the synthesizer verdict.",
+    "cohorts": [
+      {
+        "id": "slop",
+        "name": "Aegis Slop",
+        "icon": "S",
+        "layers": [
+          {
+            "id": "slop-curl-1",
+            "summary": "Boilerplate narrative comment: 'This function does X.'",
+            "file": "lib/url.c",
+            "line_start": 1,
+            "line_end": 1,
+            "severity": "info",
+            "diff_range": "+  // This function does X."
+          },
+          {
+            "id": "slop-curl-2",
+            "summary": "TODO stub masquerading as a real fix: 'refactor into smaller helpers'",
+            "file": "lib/url.c",
+            "line_start": 2,
+            "line_end": 2,
+            "severity": "warning",
+            "diff_range": "+  /* TODO: refactor into smaller helpers */"
+          }
+        ]
+      },
+      {
+        "id": "security",
+        "name": "Aegis Security",
+        "icon": "X",
+        "layers": [
+          {
+            "id": "sec-curl-1",
+            "summary": "CRITICAL: Hallucinated vulnerability. Function Curl_urldecode() does not exist in current curl; the alleged buffer overflow does not reproduce.",
+            "file": "lib/url.c",
+            "line_start": 0,
+            "line_end": 0,
+            "severity": "critical",
+            "diff_range": "+char *buf = malloc(strlen(url) * 8);  // not a real fix"
+          }
+        ]
+      },
+      {
+        "id": "arch",
+        "name": "Aegis Arch",
+        "icon": "A",
+        "layers": [
+          {
+            "id": "arch-curl-1",
+            "summary": "Bypasses the existing url.c parse pipeline (Curl_url_set) and reinvents URL handling locally",
+            "file": "lib/url.c",
+            "line_start": 0,
+            "line_end": 0,
+            "severity": "warning",
+            "diff_range": "+static CURLcode Curl_urldecode(...) { ... }"
+          }
+        ]
+      },
+      {
+        "id": "verdict",
+        "name": "Aegis Verdict",
+        "icon": "V",
+        "layers": [
+          {
+            "id": "v-curl-1",
+            "summary": "Risk 0.92 / 1.00 -- Halted. CordonEnforcer isolates the hallucinated vuln. No comment posted; no labels set.",
+            "file": "-",
+            "line_start": 0,
+            "line_end": 0,
+            "severity": "error",
+            "diff_range": "Signed verdict: Halted (1 critical hallucination)"
+          }
+        ]
+      }
+    ],
+    "latency_ms": 4200,
+    "tokens_estimated": 1240,
+    "deterministic_layer_ms": 12
+  },
+  {
+    "id": "react-2026-01-hardcoded-stripe-key",
+    "project": "react",
+    "pr_url": "https://github.com/facebook/react/pull/28901",
+    "title": "feat: add Stripe checkout integration",
+    "language": "TypeScript",
+    "diff_excerpt": "+const STRIPE_SECRET = 'STRIPE_LIVE_KEY_HERE';\n+// This function does X: it creates a checkout session.\n+export async function createCheckout(items: CartItem[]) {\n+  const session = await fetch('https://api.stripe.com/v1/checkout/sessions', {\n+    headers: { Authorization: `Bearer ${STRIPE_SECRET}` },\n+    method: 'POST',\n+    body: JSON.stringify({ line_items: items.map(i => ({ ...i })) }),\n+  });\n+  return session.clone().json();\n+}",
+    "source": "Classic AI slop pattern: hardcoded API key + defensive .clone() everywhere + 'This function does X' boilerplate",
+    "verdict": "Halted",
+    "risk_score": 0.97,
+    "slop_score": 0.55,
+    "fit_score": 0.2,
+    "security_summary": "CRITICAL (CWE-798): Hardcoded Stripe live secret key in source. CWE-200: response.clone() exposes payment intent data in memory. Must move to env var + secret manager; do not commit.",
+    "cohorts": [
+      {
+        "id": "slop",
+        "name": "Aegis Slop",
+        "icon": "S",
+        "layers": [
+          {
+            "id": "slop-react-1",
+            "summary": "Boilerplate 'This function does X' doc-comment on a one-liner",
+            "file": "src/checkout.ts",
+            "line_start": 1,
+            "line_end": 1,
+            "severity": "info",
+            "diff_range": "+// This function does X: it creates a checkout session."
+          }
+        ]
+      },
+      {
+        "id": "security",
+        "name": "Aegis Security",
+        "icon": "X",
+        "layers": [
+          {
+            "id": "sec-react-1",
+            "summary": "CRITICAL (CWE-798): Hardcoded Stripe live secret key committed to source",
+            "file": "src/checkout.ts",
+            "line_start": 1,
+            "line_end": 1,
+            "severity": "critical",
+            "diff_range": "+const STRIPE_SECRET = 'STRIPE_LIVE_KEY_HERE';"
+          },
+          {
+            "id": "sec-react-2",
+            "summary": "WARNING (CWE-200): response.clone() retains full payload in memory unnecessarily",
+            "file": "src/checkout.ts",
+            "line_start": 8,
+            "line_end": 8,
+            "severity": "warning",
+            "diff_range": "+return session.clone().json();"
+          }
+        ]
+      },
+      {
+        "id": "arch",
+        "name": "Aegis Arch",
+        "icon": "A",
+        "layers": [
+          {
+            "id": "arch-react-1",
+            "summary": "Bypasses the existing payment-provider abstraction (PaymentProvider interface) and hardcodes Stripe",
+            "file": "src/checkout.ts",
+            "line_start": 0,
+            "line_end": 0,
+            "severity": "warning",
+            "diff_range": "+const STRIPE_SECRET = '...';"
+          }
+        ]
+      },
+      {
+        "id": "verdict",
+        "name": "Aegis Verdict",
+        "icon": "V",
+        "layers": [
+          {
+            "id": "v-react-1",
+            "summary": "Risk 0.97 / 1.00 -- Halted. Must move secret to env var + secret manager; do not merge.",
+            "file": "-",
+            "line_start": 0,
+            "line_end": 0,
+            "severity": "error",
+            "diff_range": "Signed verdict: Halted (CWE-798)"
+          }
+        ]
+      }
+    ],
+    "latency_ms": 5100,
+    "tokens_estimated": 1820,
+    "deterministic_layer_ms": 9
+  },
+  {
+    "id": "typescript-2026-02-defensive-clone",
+    "project": "typescript",
+    "pr_url": "https://github.com/microsoft/TypeScript/pull/56420",
+    "title": "refactor: simplify ts.transform signature",
+    "language": "TypeScript",
+    "diff_excerpt": "+// This function does X: it transforms a source file.\n+// We need to make a defensive copy to avoid aliasing.\n+export function transform(source: SourceFile, opts: Options): SourceFile {\n+  const cloned = source.clone();\n+  // This function does X: it normalizes the AST.\n+  const normalized = normalize(cloned.clone());\n+  // We need to walk every node.\n+  for (const node of normalized.clone().statements) {\n+    node.clone();  // <-- ignored return value\n+  }\n+  return normalized;\n+}",
+    "source": "Defensive .clone() everywhere + boilerplate 'This function does X' / 'We need to' narrative comments; classic LLM verbose-cargo pattern",
+    "verdict": "ReviewRequired",
+    "risk_score": 0.45,
+    "slop_score": 0.72,
+    "fit_score": 0.55,
+    "security_summary": "No security regressions. SLOP signals: 4 boilerplate doc-comments, 3 defensive .clone() calls, 1 ignored return value (.clone() in for-loop body). Deterministic layer caught all 4 comments in 8ms.",
+    "cohorts": [
+      {
+        "id": "slop",
+        "name": "Aegis Slop",
+        "icon": "S",
+        "layers": [
+          {
+            "id": "slop-ts-1",
+            "summary": "Boilerplate narrative: 'This function does X' / 'We need to' pattern (4 instances)",
+            "file": "src/compiler/transform.ts",
+            "line_start": 1,
+            "line_end": 5,
+            "severity": "warning",
+            "diff_range": "+// This function does X: it transforms a source file.\n+// We need to make a defensive copy to avoid aliasing."
+          },
+          {
+            "id": "slop-ts-2",
+            "summary": "Defensive .clone() chain (3 calls in 1 function); defensible only for explicit hot-loop isolation",
+            "file": "src/compiler/transform.ts",
+            "line_start": 4,
+            "line_end": 8,
+            "severity": "warning",
+            "diff_range": "+const cloned = source.clone();\n+const normalized = normalize(cloned.clone());"
+          }
+        ]
+      },
+      {
+        "id": "security",
+        "name": "Aegis Security",
+        "icon": "X",
+        "layers": []
+      },
+      {
+        "id": "arch",
+        "name": "Aegis Arch",
+        "icon": "A",
+        "layers": [
+          {
+            "id": "arch-ts-1",
+            "summary": "INFO: signature change to transform() is backwards compatible; no breaking impact",
+            "file": "src/compiler/transform.ts",
+            "line_start": 0,
+            "line_end": 0,
+            "severity": "info",
+            "diff_range": "+export function transform(source: SourceFile, opts: Options): SourceFile {"
+          }
+        ]
+      },
+      {
+        "id": "verdict",
+        "name": "Aegis Verdict",
+        "icon": "V",
+        "layers": [
+          {
+            "id": "v-ts-1",
+            "summary": "Risk 0.45 / 1.00 -- ReviewRequired. Strip narrative comments; reduce .clone() to documented invariant boundary.",
+            "file": "-",
+            "line_start": 0,
+            "line_end": 0,
+            "severity": "warning",
+            "diff_range": "Signed verdict: ReviewRequired (4 SLOP, 0 SEC, 0 ARCH)"
+          }
+        ]
+      }
+    ],
+    "latency_ms": 3800,
+    "tokens_estimated": 980,
+    "deterministic_layer_ms": 8
+  },
+  {
+    "id": "godot-2026-03-bloated-comments",
+    "project": "godot",
+    "pr_url": "https://github.com/godotengine/godot/pull/92114",
+    "title": "feat: add Path3D::get_closest_point helper",
+    "language": "GDScript",
+    "diff_excerpt": "## Description\n## This function does X: it returns the closest point on a curve to a given point in 3D space.\n## We need to handle the edge case where the curve has zero length.\n## Notes\n## - Refactor later if perf becomes a concern.\nfunc get_closest_point(p: Vector3) -> Vector3:\n    # TODO: implement\n    return Vector3.ZERO\n\nfunc _unused_helper() -> void:\n    pass  # placeholder for future use\n",
+    "source": "Godot 4.x PR noise pattern: '## Description / ## Notes' bloat + dead pub-ish fns + TODO stub as the only implementation",
+    "verdict": "ReviewRequired",
+    "risk_score": 0.4,
+    "slop_score": 0.8,
+    "fit_score": 0.5,
+    "security_summary": "No security regressions. SLOP signals: 5 '## This function does X' / '## We need to' bloat headers (out of style for GDScript), 1 TODO stub (the only real code), 1 unused pub fn (SLOP-005).",
+    "cohorts": [
+      {
+        "id": "slop",
+        "name": "Aegis Slop",
+        "icon": "S",
+        "layers": [
+          {
+            "id": "slop-gd-1",
+            "summary": "Bloated '## Description / ## Notes' header bloat; not the GDScript doc-comment style used elsewhere in the repo",
+            "file": "scene/3d/path_3d.gd",
+            "line_start": 1,
+            "line_end": 5,
+            "severity": "warning",
+            "diff_range": "+## Description\n+## This function does X: it returns the closest point..."
+          },
+          {
+            "id": "slop-gd-2",
+            "summary": "TODO stub as the entire implementation (SLOP-003)",
+            "file": "scene/3d/path_3d.gd",
+            "line_start": 8,
+            "line_end": 9,
+            "severity": "error",
+            "diff_range": "+    # TODO: implement\n+    return Vector3.ZERO"
+          },
+          {
+            "id": "slop-gd-3",
+            "summary": "Unused pub fn placeholder (SLOP-005)",
+            "file": "scene/3d/path_3d.gd",
+            "line_start": 11,
+            "line_end": 12,
+            "severity": "warning",
+            "diff_range": "+func _unused_helper() -> void:\n+    pass"
+          }
+        ]
+      },
+      {
+        "id": "security",
+        "name": "Aegis Security",
+        "icon": "X",
+        "layers": []
+      },
+      {
+        "id": "arch",
+        "name": "Aegis Arch",
+        "icon": "A",
+        "layers": [
+          {
+            "id": "arch-gd-1",
+            "summary": "INFO: get_closest_point() is the right API shape; placement on Path3D is correct",
+            "file": "scene/3d/path_3d.gd",
+            "line_start": 0,
+            "line_end": 0,
+            "severity": "info",
+            "diff_range": "+func get_closest_point(p: Vector3) -> Vector3:"
+          }
+        ]
+      },
+      {
+        "id": "verdict",
+        "name": "Aegis Verdict",
+        "icon": "V",
+        "layers": [
+          {
+            "id": "v-gd-1",
+            "summary": "Risk 0.40 / 1.00 -- ReviewRequired. Implement the function; drop bloat headers; remove _unused_helper.",
+            "file": "-",
+            "line_start": 0,
+            "line_end": 0,
+            "severity": "warning",
+            "diff_range": "Signed verdict: ReviewRequired (3 SLOP, 0 SEC, 0 ARCH)"
+          }
+        ]
+      }
+    ],
+    "latency_ms": 4400,
+    "tokens_estimated": 1310,
+    "deterministic_layer_ms": 11
+  },
+  {
+    "id": "tldraw-2026-04-ai-slop-assertions",
+    "project": "tldraw",
+    "pr_url": "https://github.com/tldraw/tldraw/pull/4521",
+    "title": "feat: add keyboard shortcut to duplicate selection",
+    "language": "TypeScript",
+    "diff_excerpt": "// We need to add a keyboard shortcut for duplicating the current selection.\n// This function does X: it duplicates the selected shapes.\nfunction duplicateSelection(editor: Editor) {\n  // We need to make a defensive copy to avoid mutating the selection.\n  const cloned = editor.selectedShapes.slice().clone()\n  for (const shape of cloned.clone()) {\n    // We need to add the new shape to the store.\n    editor.createShape(shape.clone())\n  }\n  return true\n}\n\nit('duplicates the selection', () => {\n  // We need to verify the shapes are duplicated.\n  assert.equal(true, true)  // <-- tautological assertion\n})\n",
+    "source": "Modeled on Steve Ruiz's 'Stay away from my trash' blog: 'We need to' boilerplate + defensive .clone() + tautological assertions in test files",
+    "verdict": "ReviewRequired",
+    "risk_score": 0.5,
+    "slop_score": 0.85,
+    "fit_score": 0.45,
+    "security_summary": "No security regressions. SLOP signals: 5 'We need to' / 'This function does X' boilerplate comments, 4 defensive .clone() calls (none required by Editor contract), 1 tautological assertion (SLOP-EVASION-007: assert.equal(true, true)).",
+    "cohorts": [
+      {
+        "id": "slop",
+        "name": "Aegis Slop",
+        "icon": "S",
+        "layers": [
+          {
+            "id": "slop-tld-1",
+            "summary": "Boilerplate 'We need to' narrative comments (4 instances)",
+            "file": "packages/editor/src/lib/editor/duplicateSelection.ts",
+            "line_start": 1,
+            "line_end": 1,
+            "severity": "warning",
+            "diff_range": "+// We need to add a keyboard shortcut for duplicating the current selection."
+          },
+          {
+            "id": "slop-tld-2",
+            "summary": "Defensive .clone() chain (4 calls); Editor.selectedShapes is already immutable",
+            "file": "packages/editor/src/lib/editor/duplicateSelection.ts",
+            "line_start": 4,
+            "line_end": 8,
+            "severity": "warning",
+            "diff_range": "+const cloned = editor.selectedShapes.slice().clone()"
+          },
+          {
+            "id": "slop-tld-3",
+            "summary": "Tautological assertion in test (SLOP-EVASION-007): assert.equal(true, true)",
+            "file": "packages/editor/src/lib/editor/duplicateSelection.test.ts",
+            "line_start": 15,
+            "line_end": 15,
+            "severity": "error",
+            "diff_range": "+  assert.equal(true, true)  // <-- tautological"
+          }
+        ]
+      },
+      {
+        "id": "security",
+        "name": "Aegis Security",
+        "icon": "X",
+        "layers": []
+      },
+      {
+        "id": "arch",
+        "name": "Aegis Arch",
+        "icon": "A",
+        "layers": [
+          {
+            "id": "arch-tld-1",
+            "summary": "INFO: keyboard shortcut should be wired in the existing useKeyboardShortcuts hook, not a free-floating function",
+            "file": "packages/editor/src/lib/editor/duplicateSelection.ts",
+            "line_start": 0,
+            "line_end": 0,
+            "severity": "info",
+            "diff_range": "+function duplicateSelection(editor: Editor) {"
+          }
+        ]
+      },
+      {
+        "id": "verdict",
+        "name": "Aegis Verdict",
+        "icon": "V",
+        "layers": [
+          {
+            "id": "v-tld-1",
+            "summary": "Risk 0.50 / 1.00 -- ReviewRequired. Strip 'We need to' comments; drop .clone() chain; replace tautological assertion with a real expectation (e.g. expect(editor.selectedShapes.length).toBe(2 * initial)).",
+            "file": "-",
+            "line_start": 0,
+            "line_end": 0,
+            "severity": "warning",
+            "diff_range": "Signed verdict: ReviewRequired (3 SLOP, 0 SEC, 1 ARCH-INFO)"
+          }
+        ]
+      }
+    ],
+    "latency_ms": 3950,
+    "tokens_estimated": 1100,
+    "deterministic_layer_ms": 10
+  }
+]

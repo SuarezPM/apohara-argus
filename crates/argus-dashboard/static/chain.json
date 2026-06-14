@@ -1,0 +1,56 @@
+[
+  {
+    "audit_id": "audit-001-2026-06-13-001",
+    "timestamp": "2026-06-13T14:00:00Z",
+    "model_id": "meta/llama-3.1-70b-instruct",
+    "prompt_template_version": "verify-worker-v1-policy-abc123",
+    "prompt_fingerprint": "b3:b5494f4255843fc73e3865bcd08939e989bf3561fb0d7538fc7cea09c464dd59",
+    "response_fingerprint": "b3:db66cba5f89d48ba759bce7fd8f0201b8903f5ab5c7fdfcbe9aa59f730dfc03a",
+    "data_class": "source_code",
+    "policy_version": "verify-worker-v1-policy",
+    "decision": {
+      "verdict": "Halted",
+      "findings_count": 1,
+      "rationale": "Hallucinated vuln in Curl_urldecode"
+    },
+    "prev_hash": "b3:0000000000000000000000000000000000000000000000000000000000000000",
+    "current_hash": "b3:e2764ee2eaaa9793a4d54ba33bf6f1a0a894a83ac3998fc1ce93dca32ce9fa0c",
+    "signature": "ed25519:432328bfb7ac8cc8d740b38a4455926c238c8606ed6b7ff9b782d9ec9dea618c17d2f72d1b96e60f257b9990e1aeb98350441287ea1627d0bc3aaed2f5fff91a"
+  },
+  {
+    "audit_id": "audit-002-2026-06-13-002",
+    "timestamp": "2026-06-13T14:00:04Z",
+    "model_id": "meta/llama-3.1-70b-instruct",
+    "prompt_template_version": "verify-worker-v1-policy-abc123",
+    "prompt_fingerprint": "b3:4e741a819d2779c4f8a72ee46012479154b4a6db134f8e709d615ef6a702f866",
+    "response_fingerprint": "b3:e59e12bf98fd8b8f34858ee3c6ea17c2f41824e5df11f09b344a1c98453ecddf",
+    "data_class": "source_code",
+    "policy_version": "verify-worker-v1-policy",
+    "decision": {
+      "verdict": "Halted",
+      "findings_count": 1,
+      "rationale": "Hardcoded Stripe secret"
+    },
+    "prev_hash": "b3:e2764ee2eaaa9793a4d54ba33bf6f1a0a894a83ac3998fc1ce93dca32ce9fa0c",
+    "current_hash": "b3:4da78e6bdb4589036360f35e13f8582f1b25b15be5d83ec723b4a8336367048e",
+    "signature": "ed25519:c9ac255af8b3900dcc5e7236861c6da1100fc2ca7bb5378c668cbf7cfc7c85b7a0a0e1853acf84def11503703c15aee891843dbff0a6243fb08b4302fe183cfa"
+  },
+  {
+    "audit_id": "audit-003-2026-06-13-003",
+    "timestamp": "2026-06-13T14:00:09Z",
+    "model_id": "meta/llama-3.1-70b-instruct",
+    "prompt_template_version": "verify-worker-v1-policy-abc123",
+    "prompt_fingerprint": "b3:e1530e4531761d8da92a780383b625871c405e94a9934aa2897ac331cea7ab4d",
+    "response_fingerprint": "b3:0000d284f32b74ae91696a809c0dd81445044df256198b130a786cb521015316",
+    "data_class": "source_code",
+    "policy_version": "verify-worker-v1-policy",
+    "decision": {
+      "verdict": "ReviewRequired",
+      "findings_count": 2,
+      "rationale": "Defensive .clone()"
+    },
+    "prev_hash": "b3:4da78e6bdb4589036360f35e13f8582f1b25b15be5d83ec723b4a8336367048e",
+    "current_hash": "b3:298fbab9a3a8cc18c48867c79613610feb17c5cad51e9388560487486e6d89cf",
+    "signature": "ed25519:d1dad3f70de04d924bee455dea0f91fbf665f52886b83247229bdfdcae34cddca343c2b9de87cc70072c42189d12d2e8d0a0e1ed27c6f4b427e90c54c2b64369"
+  }
+]
