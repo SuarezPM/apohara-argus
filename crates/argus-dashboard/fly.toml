@@ -34,6 +34,15 @@ app = "argus-dashboard"
 primary_region = "iad"
 
 [build]
+  # Default build context is the directory containing this
+  # fly.toml, which is `crates/argus-dashboard/`. The
+  # Dockerfile here, however, COPYs paths like `Cargo.toml`
+  # and `crates/argus-verify/tests` that only exist at the
+  # workspace root, so we override the context to `../..`
+  # (the parent of the parent of the fly.toml's directory,
+  # i.e. the apohara-argus workspace root). Without this,
+  # the build dies with `"/Cargo.lock": not found`.
+  context = "../.."
   dockerfile = "Dockerfile"
 
 [env]
