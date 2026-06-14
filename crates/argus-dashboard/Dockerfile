@@ -96,6 +96,12 @@ RUN mkdir -p crates/argus-dashboard/src && \
 # Now copy the real sources. This invalidates the build
 # cache only on source-only changes.
 COPY crates/apohara-argus-core/src crates/apohara-argus-core/src
+# Copy the 4 specialist prompt files (01-slop-detector.md
+# through 04-verdict-synthesizer.md). prompts.rs embeds them
+# at compile time via `include_str!("../prompts/...")` so
+# they must be in the builder's /build tree, not just in
+# the build-context tar.
+COPY crates/apohara-argus-core/prompts crates/apohara-argus-core/prompts
 COPY crates/argus-crypto/src crates/argus-crypto/src
 COPY crates/argus-llm/src crates/argus-llm/src
 COPY crates/argus-slop/src crates/argus-slop/src
