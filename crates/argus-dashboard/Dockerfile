@@ -110,6 +110,12 @@ COPY crates/apohara-argus-cli/src crates/apohara-argus-cli/src
 COPY crates/argus-otel/src crates/argus-otel/src
 COPY crates/apohara-argus-mcp/src crates/apohara-argus-mcp/src
 COPY crates/argus-benchmarks/src crates/argus-benchmarks/src
+# Copy the [[bench]] sources too. Cargo's workspace resolver
+# parses every member's Cargo.toml even when building a
+# single bin; if a [[bench]] name lacks the matching
+# benches/<name>.rs file, the build dies with
+# `can't find 'cost' bench at 'benches/cost.rs'`.
+COPY crates/argus-benchmarks/benches crates/argus-benchmarks/benches
 COPY crates/argus-github-app/src crates/argus-github-app/src
 COPY crates/argus-slop/tests crates/argus-slop/tests
 COPY crates/argus-verify/tests crates/argus-verify/tests
