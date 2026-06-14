@@ -7,7 +7,7 @@ before touching the repo.
 
 ARGUS = **AI Review & Governance for Undermining Slop** (the trust
 layer for AI-generated code). A **hybrid (deterministic regex + LLM
-semantic) defense layer** packaged as a **14-crate Rust workspace**.
+semantic) defense layer** packaged as a **15-crate Rust workspace**.
 Three runtime surfaces (`argus-guard` pre-commit, `argus-verify` PR
 review HTTP, `argus-lens` weekly digest) plus a **MCP server**
 (`apohara-argus-mcp`) that exposes the 4 specialists (`aegis_slop`,
@@ -159,7 +159,7 @@ No claim ships that a test cannot back.
 
 ## Project state (Wave S.1 starting point)
 
-- **Workspace**: 14 crates, all Rust 2021, `rust-version =
+- **Workspace**: 15 crates, all Rust 2021, `rust-version =
   "1.88"`, `license = "MIT"`.
 - **Three runtime surfaces**: `argus-guard`, `argus-verify`,
   `argus-lens` (all 3 in v0.1).

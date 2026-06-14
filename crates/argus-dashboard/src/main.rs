@@ -394,7 +394,7 @@ fn render_landing(briefing_md: &str) -> String {
       <tr><td>A2A AgentCards (Google protocol)</td><td class="us">✅</td><td class="them">❌</td><td class="them">❌</td><td class="them">❌</td></tr>
       <tr><td>Hybrid detection (deterministic + LLM)</td><td class="us">✅ 5 SLOP rules</td><td class="them">LLM only</td><td class="them">LLM only</td><td class="them">LLM only</td></tr>
       <tr><td>CordonEnforcer (synthesizer doesn't see raw code)</td><td class="us">✅</td><td class="them">❌</td><td class="them">❌</td><td class="them">❌</td></tr>
-      <tr><td>Pure Rust 100%</td><td class="us">✅ 14 crates</td><td class="them">TS/Node</td><td class="them">TS/Node</td><td class="them">TS/Node</td></tr>
+      <tr><td>Pure Rust 100%</td><td class="us">✅ 15 crates</td><td class="them">TS/Node</td><td class="them">TS/Node</td><td class="them">TS/Node</td></tr>
       <tr><td>Open source</td><td class="us">MIT</td><td class="them">❌</td><td class="them">❌</td><td class="them">❌</td></tr>
     </tbody>
   </table>

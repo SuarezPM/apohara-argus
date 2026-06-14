@@ -1,6 +1,6 @@
 # argus-benchmarks
 
-The 14th crate in the ARGUS workspace. Internal-only (`publish = false`).
+The 15th crate in the ARGUS workspace. Internal-only (`publish = false`).
 Holds:
 
 - `data/prs.jsonl` — the labeled PR dataset (≥30 entries, mix of

@@ -1,6 +1,6 @@
 name: Bench
 
-# Bench workflow: runs the 3 `harness = false` benches in the 14th
+# Bench workflow: runs the 3 `harness = false` benches in the 15th
 # crate (argus-benchmarks) on every PR and push to main. The job is
 # INFORMATIONAL — a red bench does NOT block the merge. It surfaces
 # precision/recall, latency, and cost regressions as a workflow

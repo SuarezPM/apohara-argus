@@ -37,6 +37,13 @@ use crate::app_state::AppState;
 /// fork the App — there is no env-var knob for the manifest
 /// fields, by design.
 ///
+/// The one exception is `hook_attributes.url`: the
+/// per-deployment webhook endpoint is **not** a build-time
+/// concern. It is sourced from the `ARGUS_APP_WEBHOOK_URL`
+/// environment variable at request time, and the static
+/// `MANIFEST` carries an empty string in that slot. The empty
+/// string is overwritten by [`manifest_with_webhook_url`].
+///
 /// `https://github.com/SuarezPM/apohara-argus` is the
 /// canonical repo home. The same URL is used as the App's
 /// public homepage, the setup URL, and the post-install
@@ -45,7 +52,7 @@ pub const MANIFEST: &str = r#"{
   "name": "ARGUS",
   "url": "https://github.com/SuarezPM/apohara-argus",
   "hook_attributes": {
-    "url": "https://apohara-argus.fly.dev/webhook",
+    "url": "",
     "active": true
   },
   "redirect_url": "https://github.com/SuarezPM/apohara-argus",
@@ -61,6 +68,23 @@ pub const MANIFEST: &str = r#"{
   }
 }"#;
 
+/// Build a manifest JSON string with `hook_attributes.url`
+/// set to `<base>/webhook`. The trailing slash on `base` is
+/// tolerated (trimmed), so operators can pass
+/// `https://example.com` or `https://example.com/` and get
+/// the same result.
+///
+/// This is the *only* mutable field in the manifest at
+/// runtime. All other fields stay compile-time-constant so
+/// they cannot drift from the App's actual permissions.
+pub fn manifest_with_webhook_url(base: &str) -> String {
+    let mut v: Value =
+        serde_json::from_str(MANIFEST).expect("MANIFEST is valid JSON (enforced by tests)");
+    let trimmed = base.trim_end_matches('/');
+    v["hook_attributes"]["url"] = Value::String(format!("{}/webhook", trimmed));
+    serde_json::to_string(&v).expect("re-serializing a parsed Value is infallible")
+}
+
 /// The JSON shape we return at `GET /setup`. The wrapper struct
 /// gives us a place to add a one-liner summary without breaking
 /// the manifest structure that GitHub expects.
@@ -73,20 +97,25 @@ pub struct SetupResponse {
 
 impl SetupResponse {
     pub fn current() -> Self {
-        // The manifest is a static string; we parse it on
-        // every request so the JSON is always valid (a typo
-        // in the source would fail to compile through
-        // `serde_json::from_str` in tests).
-        let manifest: Value =
-            serde_json::from_str(MANIFEST).expect("MANIFEST is valid JSON (enforced by tests)");
+        // The webhook URL is **per-deployment**: we read it
+        // from the environment at request time. The default
+        // is a visible placeholder so a missing env var is
+        // obvious in the rendered manifest — GitHub will
+        // refuse the install (or silently drop events) if the
+        // URL is left as the placeholder.
+        let base = std::env::var("ARGUS_APP_WEBHOOK_URL")
+            .unwrap_or_else(|_| "https://REPLACE_AT_INSTALL".to_string());
+        let manifest_str = manifest_with_webhook_url(&base);
+        let manifest: Value = serde_json::from_str(&manifest_str)
+            .expect("manifest_with_webhook_url returns valid JSON");
         let install_url = format!(
             "https://github.com/settings/apps/new?manifest={}",
-            urlencoding(MANIFEST)
+            urlencoding(&manifest_str)
         );
         Self {
             manifest,
             install_url,
-            notes: "POST the `manifest` field to https://api.github.com/app-manifests/{code} after GitHub shows you the confirmation page. The webhook URL inside the manifest is a placeholder; your self-hosted App must overwrite it with your own endpoint.",
+            notes: "POST the `manifest` field to https://api.github.com/app-manifests/{code} after GitHub shows you the confirmation page. The webhook URL inside the manifest is read from the ARGUS_APP_WEBHOOK_URL env var at request time. Operators MUST set ARGUS_APP_WEBHOOK_URL to a URL they control BEFORE installing — the placeholder default (https://REPLACE_AT_INSTALL/webhook) will not receive events.",
         }
     }
 }
@@ -217,5 +246,81 @@ mod tests {
         assert_eq!(encoded, "%7B%7D");
         let encoded = urlencoding("\"");
         assert_eq!(encoded, "%22");
+    }
+
+    #[test]
+    fn manifest_with_webhook_url_sets_url() {
+        let out = manifest_with_webhook_url("https://example.com");
+        let v: Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(
+            v["hook_attributes"]["url"]
+                .as_str()
+                .expect("hook url is a string"),
+            "https://example.com/webhook"
+        );
+    }
+
+    #[test]
+    fn manifest_with_webhook_url_trims_trailing_slash() {
+        let out = manifest_with_webhook_url("https://example.com/");
+        let v: Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(
+            v["hook_attributes"]["url"]
+                .as_str()
+                .expect("hook url is a string"),
+            "https://example.com/webhook"
+        );
+    }
+
+    #[test]
+    fn manifest_with_webhook_url_preserves_other_fields() {
+        // The webhook URL is the ONLY field that changes —
+        // permissions, events, and the public URL must stay
+        // byte-for-byte identical to the static MANIFEST.
+        let out = manifest_with_webhook_url("https://example.com");
+        let original: Value = serde_json::from_str(MANIFEST).unwrap();
+        let mutated: Value = serde_json::from_str(&out).unwrap();
+        for key in [
+            "name",
+            "url",
+            "redirect_url",
+            "callback_urls",
+            "public",
+            "default_events",
+            "default_permissions",
+        ] {
+            assert_eq!(
+                original[key], mutated[key],
+                "field `{}` must not change when only the webhook URL is rewritten",
+                key
+            );
+        }
+    }
+
+    #[test]
+    fn env_var_overrides_webhook_url() {
+        // This is the *only* env-mutating test in the file;
+        // a single Mutex serializes it against any future
+        // env-mutating test (poisoned lock is treated as
+        // released so a panicking sibling does not block
+        // this one forever).
+        use std::sync::Mutex;
+        static ENV_LOCK: Mutex<()> = Mutex::new(());
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
+        let prev = std::env::var("ARGUS_APP_WEBHOOK_URL").ok();
+        std::env::set_var("ARGUS_APP_WEBHOOK_URL", "https://env-test.example.com");
+        let resp = SetupResponse::current();
+        // Always restore — the env var is process-global.
+        match prev {
+            Some(v) => std::env::set_var("ARGUS_APP_WEBHOOK_URL", v),
+            None => std::env::remove_var("ARGUS_APP_WEBHOOK_URL"),
+        }
+        assert_eq!(
+            resp.manifest["hook_attributes"]["url"]
+                .as_str()
+                .expect("hook url is a string"),
+            "https://env-test.example.com/webhook"
+        );
     }
 }

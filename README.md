@@ -143,7 +143,7 @@ Opt-in via `ARGUS_A2A_DISABLED=false`. Google A2A orchestrators can discover and
 
 ### 7. Pure Rust 100%, MSRV 1.88
 
-- 14 crates, 4 binaries
+- 15 crates, 4 binaries
 - 145+ tests passing
 - `cargo build --release` in 1m 27s
 - Zero Python, zero Node.js in the production binary
@@ -329,7 +329,7 @@ wired and tested today. The full pricing breakdown is in
 | **EU AI Act Art. 12** | Level 2 ready | Regulators can verify via `curl /audit/export` |
 | **Per-dev cost** | $0.05/month (BYOK) | 100× cheaper than CodeRabbit ($0.10-0.50/PR) |
 | **Pure Rust** | 100% | No Python, no Node.js in production |
-| **Crates** | 14 | 4 binaries |
+| **Crates** | 15 | 4 binaries |
 | **MSRV** | 1.88 | Compatible with stable Rust 2024 |
 | **Commits** | 23+ | Each item atomic, scoped, spec-referenced |
 
