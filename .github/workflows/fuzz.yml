@@ -124,12 +124,36 @@ jobs:
       # so the `-Zsanitizer=address` RUSTFLAGS that
       # cargo-fuzz injects are accepted.
       - name: Build fuzz targets
+        env:
+          # `RUSTC_BOOTSTRAP=1` is REQUIRED to compile
+          # the fuzz targets. The `rustix` crate (a
+          # transitive dep of `cargo-fuzz`) uses
+          # `#[cfg_attr(rustc_attrs,
+          #   rustc_layout_scalar_valid_range_start(0xf001))]`
+          # to constrain the layout of its `c_int` type
+          # so the compiler can't elide bounds checks.
+          # The `rustc_attrs` cfg flag is normally only
+          # set when the rustc compiler itself is being
+          # built — for external builds you have to
+          # opt in via `RUSTC_BOOTSTRAP=1`. Without
+          # this, the nightly compiler rejects the
+          # attribute with:
+          #   error: attributes starting with `rustc`
+          #     are reserved for use by the `rustc`
+          #     compiler
+          # which is what the tenth run of this
+          # workflow actually failed on.
+          RUSTC_BOOTSTRAP: '1'
         run: cargo +nightly-2026-06-01 fuzz build
 
       - name: Run argus_slop_deterministic (5 min)
+        env:
+          RUSTC_BOOTSTRAP: '1'
         run: cargo +nightly-2026-06-01 fuzz run argus_slop_deterministic -- -max_total_time=300
 
       - name: Run argus_verify_signature (5 min)
+        env:
+          RUSTC_BOOTSTRAP: '1'
         run: cargo +nightly-2026-06-01 fuzz run argus_verify_signature -- -max_total_time=300
 
       # If a crash was found, libFuzzer exits with a
@@ -165,10 +189,16 @@ jobs:
       - name: Install cargo-fuzz
         run: cargo +nightly-2026-06-01 install cargo-fuzz --version 0.13.1 --locked
       - name: Build fuzz targets
+        env:
+          RUSTC_BOOTSTRAP: '1'
         run: cargo +nightly-2026-06-01 fuzz build
       - name: Run argus_slop_deterministic (1 hour)
+        env:
+          RUSTC_BOOTSTRAP: '1'
         run: cargo +nightly-2026-06-01 fuzz run argus_slop_deterministic -- -max_total_time=3600
       - name: Run argus_verify_signature (1 hour)
+        env:
+          RUSTC_BOOTSTRAP: '1'
         run: cargo +nightly-2026-06-01 fuzz run argus_verify_signature -- -max_total_time=3600
       - name: Upload artifacts on failure
         if: failure()
