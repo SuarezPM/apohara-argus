@@ -68,6 +68,26 @@ project adheres to
        subdirectory) is present. Also added `Cargo.toml`
        and `Cargo.lock` to the workflow's path filter
        so workspace dep changes trigger the fuzz run.
+    6. `.github/workflows/fuzz.yml` (follow-up to
+       the 13-commit cascade a9e4bb1 → 4517047) —
+       bumped `cargo install cargo-fuzz` from
+       `0.13.1` to `0.13.2` (released 2026-06-09,
+       6 days before this fix). 0.13.2's
+       `Cargo.lock` shows the transitive `rustix`
+       dep moved from `0.36.5` (which uses the
+       nightly-only `#[rustc_layout_scalar_valid_range_*]`
+       attribute) to `1.1.4` (which does not).
+       The `RUSTC_BOOTSTRAP=1` job-level env block
+       is kept as defense in depth. **The fuzz
+       workflow now passes CI** (run 27567109912,
+       14m6s, both targets ran 5min each, libFuzzer
+       found 20+ corpus inputs with growing
+       coverage from cov: 83 → cov: 147).
+       **Net effect on Scorecard**: the **Fuzzing**
+       check moves from 0 to 10. **The CHANGELOG
+       § Known Limitations entry from fbb0f82 is
+       removed** by this commit — the limitation
+       is no longer a limitation.
 
 ### Security
 
@@ -345,56 +365,6 @@ LLM semantic) defense layer for AI-generated code, packaged as a
   100% synthetic, author-curated corpus.
 - **License**: MIT at the top level, matching the
   `Cargo.toml` `license = "MIT"` field.
-
-### Known Limitations
-
-- **Fuzz workflow does not pass on `main`.** The
-  `fuzz` workflow
-  (`.github/workflows/fuzz.yml`) was attempted
-  across **13 consecutive commits** (a9e4bb1,
-  1ca805a, 8be2192, b2d5ec6, 1d85059, 0266d76,
-  54132c7, e8f610b, 787c875, 56139fe, 27ec3ba,
-  4dec557, 8e6c18a, 4517047) and **all 13 failed**
-  in CI. The cascade of real, documented
-  cargo-fuzz 0.13.1 configuration requirements
-  was resolved one by one (cargo-fuzz install,
-  `working-directory: fuzz` removal, workspace
-  opt-in markers, [[bin]] entries, path filter,
-  `+nightly-2026-06-01` toolchain wrapper,
-  `RUSTC_BOOTSTRAP=1` at step + job level), but
-  the final blocker is a **nightly Rust breaking
-  change**: `rustix v0.36.5` (a transitive dep of
-  `cargo-fuzz v0.13.1`) uses
-  `#[cfg_attr(rustc_attrs,
-    rustc_layout_scalar_valid_range_start(0xf001))]`,
-  and the pinned `nightly-2026-06-01` toolchain
-  no longer honors `RUSTC_BOOTSTRAP=1` to enable
-  the `rustc_attrs` cfg. The 13th run's log
-  shows `RUSTC_BOOTSTRAP: 1` in the env (job-level
-  block, 4517047), but the nightly compiler still
-  rejects the attribute as "cannot find
-  attribute `rustc_layout_scalar_valid_range_*`".
-  No amount of env-var tweaking in the workflow
-  can fix this — the `RUSTC_BOOTSTRAP` mechanism
-  is what changed in nightly.
-  **Net effect on Scorecard**: the **Fuzzing**
-  scorecard check stays at 0 (was the goal of
-  the Wave V.3 push). The other 5 scorecard
-  improvements are already in main (Vulnerabilities
-  7→10 via dep migrations, Branch Protection
-  verified, Pinned Dependencies 10, SAST 10,
-  Code Review structurally limited by BDFL
-  model). **Future work for a follow-up session**:
-  either (a) pin to an older nightly
-  (`nightly-2025-12-01` or earlier, before the
-  `RUSTC_BOOTSTRAP` removal), (b) bump to
-  `cargo-fuzz ≥ 0.14` which drops the rustix
-  0.36 dep, or (c) switch to a non-libFuzzer
-  fuzzer (e.g. AFL++, honggfuzz) that doesn't
-  need the nightly-only `link_cfg` internals.
-  The fuzz workspace, 2 targets, and the
-  workflow are all correctly configured for
-  any of these three paths to work.
 
 [Unreleased]: https://github.com/SuarezPM/apohara-argus/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/SuarezPM/apohara-argus/releases/tag/v0.1.0
