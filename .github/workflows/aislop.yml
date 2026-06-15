@@ -19,7 +19,10 @@ jobs:
       - name: Run aislop scan
         id: scan
         run: |
-          npx --yes aislop@latest scan --format=json --output=aislop-report.json .
+          # aislop@latest does not accept `--output=<file>`; redirect
+          # stdout to the report path. `--format=json` is still the
+          # correct flag for machine-readable output.
+          npx --yes aislop@latest scan --format=json . > aislop-report.json
           SCORE=$(jq -r '.score // 0' aislop-report.json)
           echo "score=$SCORE" >> $GITHUB_OUTPUT
           echo "findings=$(jq -r '.findings | length' aislop-report.json)" >> $GITHUB_OUTPUT
