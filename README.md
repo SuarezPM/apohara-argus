@@ -13,7 +13,7 @@
 ![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)
 ![Tests 194+](https://img.shields.io/badge/tests-194%2B%20passing-brightgreen)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/SuarezPM/apohara-argus/badge)](https://scorecard.dev/viewer/?uri=github.com/SuarezPM/apohara-argus)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/XXXXX/badge)](https://www.bestpractices.dev/projects/XXXXX)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13242/badge)](https://www.bestpractices.dev/projects/13242)
 [Install](#-install) · [Quickstart](#-quickstart) · [Why](#-why-this-exists) · [What](#-what-argus-is) · [Numbers](#-the-numbers) · [Pricing](docs/pricing.md) · [Security](SECURITY.md)
 
 ---

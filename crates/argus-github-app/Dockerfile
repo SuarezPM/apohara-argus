@@ -23,7 +23,7 @@
 #     apohara-argus:dev
 
 # --- Stage 1: builder ---
-FROM rust:1.88-slim AS builder
+FROM rust:1.88-slim@sha256:38bc5a86d998772d4aec2348656ed21438d20fcdce2795b56ca434cf21430d89 AS builder
 
 # Standard Rust Dockerfile hygiene:
 # - PROTOCOLS=rustls so any transitive `reqwest` build
@@ -121,7 +121,7 @@ RUN cargo build --release --bin argus-github-app && \
     ls -la /build/target/release/argus-github-app
 
 # --- Stage 2: runtime ---
-FROM gcr.io/distroless/cc-debian12:nonroot
+FROM gcr.io/distroless/cc-debian12:nonroot@sha256:b0ae8e989418b458e0f25489bc3be523718938a2b70864cc0f6a00af1ddbd985
 
 # Distroless has no shell, so we can't `RUN` healthchecks
 # or similar. The entrypoint is the binary directly.

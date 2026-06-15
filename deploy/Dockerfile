@@ -38,7 +38,7 @@
 #                       for production deploys)
 
 # --- Stage 1: builder ---
-FROM rust:1.88-slim AS builder
+FROM rust:1.88-slim@sha256:38bc5a86d998772d4aec2348656ed21438d20fcdce2795b56ca434cf21430d89 AS builder
 
 WORKDIR /build
 
@@ -154,7 +154,7 @@ RUN cargo build --release \
         --bin argus-github-app
 
 # --- Stage 2: minimal runtime image ---
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim@sha256:96e378d7e6531ac9a15ad505478fcc2e69f371b10f5cdf87857c4b8188404716
 
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
