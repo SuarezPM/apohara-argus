@@ -72,7 +72,8 @@ impl MockGitHub {
 
         let app = Router::new()
             .route(
-                "/repos/:owner/:repo/pulls/:number",
+                // axum 0.8 changed `:capture` → `{capture}` (matchit 0.8).
+                "/repos/{owner}/{repo}/pulls/{number}",
                 get({
                     let state = state.clone();
                     move |path: axum::extract::Path<(String, String, u32)>,
@@ -116,7 +117,8 @@ impl MockGitHub {
                 }),
             )
             .route(
-                "/repos/:owner/:repo/issues/:number/comments",
+                // axum 0.8: `:capture` → `{capture}` (matchit 0.8).
+                "/repos/{owner}/{repo}/issues/{number}/comments",
                 post({
                     let state = state.clone();
                     move |path: axum::extract::Path<(String, String, u32)>,
@@ -141,7 +143,8 @@ impl MockGitHub {
                 }),
             )
             .route(
-                "/repos/:owner/:repo/issues/:number/labels",
+                // axum 0.8: `:capture` → `{capture}` (matchit 0.8).
+                "/repos/{owner}/{repo}/issues/{number}/labels",
                 axum::routing::put({
                     let state = state.clone();
                     move |path: axum::extract::Path<(String, String, u32)>,

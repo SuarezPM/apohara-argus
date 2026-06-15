@@ -1851,7 +1851,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/", get(index))
         .route("/submit", get(submit_page).post(submit_form))
         .route("/weekly", get(weekly))
-        .route("/review/:id", get(review_page))
+        // axum 0.8 changed `:capture` → `{capture}` (matchit 0.8).
+        .route("/review/{id}", get(review_page))
         .route("/analyzer", get(analyzer_page))
         .route("/chain", get(chain_page))
         .route("/static/app.js", get(app_js))

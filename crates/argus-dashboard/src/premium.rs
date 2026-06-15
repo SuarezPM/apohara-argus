@@ -172,7 +172,12 @@ pub async fn export_elastic(State(state): State<AppState>) -> Response {
 /// the gate in-process.
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/org/:org_id/dashboard", get(org_dashboard))
+        // axum 0.8 changed the path-segment capture syntax from
+        // `:capture` (axum 0.7) to `{capture}` (matchit 0.8).
+        // The handler still receives the value via
+        // `Path(org_id): Path<String>` — the variable name is
+        // what binds to the `{org_id}` capture group.
+        .route("/org/{org_id}/dashboard", get(org_dashboard))
         .route("/policy-packs", get(policy_packs))
         .route("/audit-log/export.splunk", get(export_splunk))
         .route("/audit-log/export.datadog", get(export_datadog))
