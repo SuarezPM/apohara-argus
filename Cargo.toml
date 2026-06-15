@@ -18,6 +18,19 @@ members = [
   "crates/argus-github-app",
 ]
 
+# The `fuzz/` subdirectory is INTENTIONALLY NOT in the
+# `members` list above: cargo-fuzz requires nightly Rust
+# (libFuzzer's `link_cfg` internals) and the parent
+# workspace pins to stable 1.88. Adding the `cargo-fuzz
+# = true` metadata marker here opts the workspace into
+# cargo-fuzz's subdirectory resolution: `cargo fuzz build`
+# from the workspace root will find `fuzz/Cargo.toml`
+# even though the fuzz dir is not a workspace member.
+# See .github/workflows/fuzz.yml for the nightly-Rust
+# CI job that uses this opt-in.
+[workspace.metadata]
+cargo-fuzz = true
+
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
