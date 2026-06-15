@@ -12,7 +12,15 @@
 
 use argus_verify::shutdown_signal;
 use axum::{routing::get, Json, Router};
+// The `nix` crate is Unix-only (POSIX signal + unistd). These
+// imports and the signal-driven tests that depend on them must
+// be gated with `#[cfg(unix)]` so the file compiles on the
+// Windows test runner (see ci.yml matrix). The third test in
+// the file (`no_unshielded_axum_serve_in_workspace`) is
+// platform-agnostic and runs on every target.
+#[cfg(unix)]
 use nix::sys::signal::{kill, Signal};
+#[cfg(unix)]
 use nix::unistd::Pid;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -44,6 +52,7 @@ async fn spawn_test_server() -> (SocketAddr, tokio::task::JoinHandle<()>) {
     (addr, handle)
 }
 
+#[cfg(unix)]
 #[tokio::test]
 #[allow(clippy::await_holding_lock)] // the SERIAL guard must span the whole test to serialize the signal-driven test runs
 async fn sigterm_triggers_graceful_shutdown() {
@@ -66,6 +75,7 @@ async fn sigterm_triggers_graceful_shutdown() {
     }
 }
 
+#[cfg(unix)]
 #[tokio::test]
 #[allow(clippy::await_holding_lock)] // the SERIAL guard must span the whole test to serialize the signal-driven test runs
 async fn sigint_triggers_graceful_shutdown() {
