@@ -28,6 +28,9 @@ env:
 permissions:
   contents: read
 
+permissions:
+  contents: write  # required for gh-release job (creates GitHub Releases)
+
 jobs:
   third-party-licenses:
     name: regenerate THIRD-PARTY-LICENSES
@@ -217,8 +220,6 @@ jobs:
     name: create draft GitHub Release
     needs: [manifest, attest]
     runs-on: ubuntu-latest
-    permissions:
-      contents: write  # required to create a release
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
