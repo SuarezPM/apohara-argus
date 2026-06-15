@@ -1,0 +1,126 @@
+name: fuzz
+
+# Cargo-fuzz requires nightly Rust (libFuzzer's
+# `#![feature(link_cfg)]` internals). The parent workspace
+# pins to stable 1.88 in `rust-toolchain.toml`, so this
+# workflow installs its own nightly toolchain just for the
+# fuzz job.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/argus-slop/**'
+      - 'crates/argus-verify/**'
+      - 'crates/argus-otel/**'
+      - 'fuzz/**'
+      - '.github/workflows/fuzz.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'crates/argus-slop/**'
+      - 'crates/argus-verify/**'
+      - 'crates/argus-otel/**'
+      - 'fuzz/**'
+      - '.github/workflows/fuzz.yml'
+  # Weekly full-corpus sweep to find regressions that
+  # the per-PR 10-minute window missed. The job is
+  # `fuzz_nightly` (separate `on:` block below) — see the
+  # matrix there for the longer `-runs=3600000` budget.
+  workflow_dispatch:
+
+# The two CI jobs (PR smoke + nightly full) intentionally
+# use different budgets so a regression introduced in a
+# PR is caught in < 15 min of CI time, while the weekly
+# sweep runs for 1 hour per target. Crashes are uploaded
+# as workflow artifacts and posted to the job summary.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ------------------------------------------------------------------
+  # PR smoke: 5 min per target, on every PR touching a fuzzed crate.
+  # ------------------------------------------------------------------
+  fuzz_pr:
+    name: fuzz (PR smoke, 5min/target)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      # Pin the toolchain. Nightly because cargo-fuzz
+      # needs the unstable `link_cfg` feature for the
+      # `#[no_mangle] extern "C" fn LLVMFuzzerTestOneInput`
+      # shim that libFuzzer links against.
+      - name: Install nightly Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: nightly-2026-06-01
+          components: rust-src
+
+      # We don't depend on the sccache cache for fuzz
+      # builds (they're short, and the cache hit rate is
+      # low for the fuzz-only codepath). The 5min-per-target
+      # budget is enough for libFuzzer to either find a
+      # crash or report a clean run; we don't try to maximize
+      # coverage in the PR loop.
+      - name: Build fuzz targets
+        working-directory: fuzz
+        run: cargo fuzz build
+
+      - name: Run argus_slop_deterministic (5 min)
+        working-directory: fuzz
+        run: cargo fuzz run argus_slop_deterministic -- -max_total_time=300
+
+      - name: Run argus_verify_signature (5 min)
+        working-directory: fuzz
+        run: cargo fuzz run argus_verify_signature -- -max_total_time=300
+
+      # If a crash was found, libFuzzer exits with a
+      # non-zero status and the artifact `crash-<id>` is
+      # already in the `fuzz/artifacts/<target>/` directory
+      # by the time we get here. We upload it so the PR
+      # author can pull the file and reproduce locally
+      # with `cargo fuzz run <target> <path-to-crash>`.
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: fuzz-crashes-${{ github.run_id }}
+          path: fuzz/artifacts/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # ------------------------------------------------------------------
+  # Weekly full-corpus sweep, manual_dispatch, 1 hour per target.
+  # ------------------------------------------------------------------
+  fuzz_nightly:
+    name: fuzz (nightly, 1h/target)
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == 'cron'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Install nightly Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: nightly-2026-06-01
+          components: rust-src
+      - name: Build fuzz targets
+        working-directory: fuzz
+        run: cargo fuzz build
+      - name: Run argus_slop_deterministic (1 hour)
+        working-directory: fuzz
+        run: cargo fuzz run argus_slop_deterministic -- -max_total_time=3600
+      - name: Run argus_verify_signature (1 hour)
+        working-directory: fuzz
+        run: cargo fuzz run argus_verify_signature -- -max_total_time=3600
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: fuzz-crashes-nightly-${{ github.run_id }}
+          path: fuzz/artifacts/
+          retention-days: 30
+          if-no-files-found: ignore

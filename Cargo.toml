@@ -132,8 +132,27 @@ tracing-opentelemetry = "0.33"
 # [Refs: 5] Exposes ARGUS's 4 specialists as MCP tools to Claude Code /
 # Codex / Cursor. Version 0.5 has the `#[tool]` macro API; `schemars` is
 # a direct dep (rmcp 0.5 does not re-export it). Must be >=1.0 for
-# `json_schema()` method that rmcp's macro calls. The `transport-io`
-# feature gates the stdio transport module (not `transport-stdio`).
+# `json_schema()` method that rmcp's macro calls.
+#
+# The feature flags we enable are INTENTIONALLY minimal:
+#   * `server`   — server-side `ServerHandler` trait + request router
+#   * `transport-io` — stdio transport (the only one we use; see
+#     `crates/apohara-argus-mcp/src/main.rs:16` which calls
+#     `.serve(stdio())`).
+#   * `macros`   — `#[tool]` proc macro for the 4 specialist tools
+#
+# We do NOT enable `transport-streamable-http` (the HTTP/TCP
+# transport module). Dependabot flags
+# RUSTSEC-{DNS-rebinding-or-similar} against the `rmcp` crate
+# because the Streamable HTTP transport (a different feature we
+# don't enable) has a known attack surface. The fix is to
+# opt OUT of that transport explicitly; the apohara-argus-mcp
+# binary's attack surface is the stdio pipe between the MCP
+# client and our process, which has no DNS-rebinding vector.
+# If we ever need the HTTP transport (e.g. for a hosted MCP
+# server), we'll need to bump rmcp to a version that
+# patches the DNS-rebinding vector and add explicit
+# `Host` header allow-listing at startup.
 rmcp = { version = "0.5", features = ["server", "transport-io", "macros"] }
 schemars = "1"
 chrono = { version = "0.4", features = ["serde"] }

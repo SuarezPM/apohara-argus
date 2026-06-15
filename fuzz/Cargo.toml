@@ -1,0 +1,39 @@
+[package]
+name = "apohara-argus-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# The fuzzer binary is built with `cargo fuzz run <target>`. The
+# default toolchain is nightly (libFuzzer's `#![feature(...)]`
+# internals require it), so CI installs `dtolnay/rust-toolchain`
+# with the `nightly` channel before invoking the fuzzer. We
+# pin to specific dependencies so a libFuzzer ABI change can't
+# silently break the corpus across runs.
+
+[dependencies]
+# Targets (we fuzz the public surface of these crates)
+argus-slop      = { path = "../crates/argus-slop" }
+argus-verify    = { path = "../crates/argus-verify" }
+argus-otel      = { path = "../crates/argus-otel" }
+apohara-argus-core = { path = "../crates/apohara-argus-core" }
+
+# libFuzzer's nightly-only features (`#![feature(link_cfg)]`
+# and similar) are pulled in by `cargo fuzz`'s own proc macros;
+# we do not enable any of them in our own targets. The
+# targets only need `libfuzzer-sys` for the `fuzz_target!`
+# macro and `Arbitrary` derive.
+libfuzzer-sys = "0.4"
+
+[profile.release]
+debug-assertions = true
+# libFuzzer's coverage instrumentation needs the
+# `sanitizer-coverage` LLVM pass; that's enabled by
+# cargo-fuzz's wrapper, not here.
+
+# Prevent this workspace from interfering with the parent
+# workspace's `cargo test`, `cargo clippy`, etc. The fuzz
+# targets require nightly Rust; the parent workspace pins
+# to stable 1.88. They share `target/` but produce
+# incompatible artifacts.
+[workspace]
