@@ -41,6 +41,33 @@ project adheres to
        `aislop` exits 1 on findings (linter convention);
        a defensive empty-JSON fallback covers network /
        unsupported-directory failures.
+    4. `fuzz/fuzz_targets/argus_verify_signature.rs` —
+       the second fuzz target referenced a non-existent
+       function `argus_verify::signature::verify_webhook_signature`
+       with the wrong arg order `(secret, body, header)`.
+       The real HMAC-SHA256 verifier lives in
+       `argus_github_app::signature::verify(secret, header, body)`
+       (the verifier reads the header first to extract
+       the provided digest, then reads the body to compute
+       the expected one — so the arg order in the call site
+       must match). `fuzz/Cargo.toml` also gained the
+       `argus-github-app` path dep.
+    5. `.github/workflows/fuzz.yml` — three cascading
+       fixes to get `cargo fuzz build` to find the fuzz
+       manifest: (a) added the `cargo install cargo-fuzz
+       --version 0.13.1 --locked` step that the workflow
+       was missing; (b) removed the wrong
+       `working-directory: fuzz` from every cargo-fuzz
+       step (cargo-fuzz resolves `fuzz/Cargo.toml` relative
+       to the WORKSPACE ROOT, not the cwd — the earlier
+       cwd shift made cargo-fuzz look for
+       `fuzz/fuzz/Cargo.toml` and fail); (c) added
+       `[workspace.metadata] cargo-fuzz = true` to the
+       root `Cargo.toml` so cargo-fuzz's opt-in marker
+       (which it reads to allow a non-member fuzz
+       subdirectory) is present. Also added `Cargo.toml`
+       and `Cargo.lock` to the workflow's path filter
+       so workspace dep changes trigger the fuzz run.
 
 ### Security
 

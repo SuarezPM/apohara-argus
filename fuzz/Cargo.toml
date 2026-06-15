@@ -12,11 +12,27 @@ publish = false
 # silently break the corpus across runs.
 
 [dependencies]
-# Targets (we fuzz the public surface of these crates)
+# Targets (we fuzz the public surface of these crates).
+# Each fuzz target in `fuzz_targets/` depends on exactly
+# the subset it needs; the unused crate deps stay here
+# so future targets can pull them in without editing the
+# manifest. The fuzz workspace is intentionally separate
+# from the parent workspace (see `[workspace]` at the
+# bottom of this file): the parent pins stable 1.88,
+# cargo-fuzz requires nightly for libFuzzer's
+# `#![feature(link_cfg)]` internals.
 argus-slop      = { path = "../crates/argus-slop" }
 argus-verify    = { path = "../crates/argus-verify" }
 argus-otel      = { path = "../crates/argus-otel" }
 apohara-argus-core = { path = "../crates/apohara-argus-core" }
+# `argus-github-app` is the GitHub App binary crate; its
+# `signature` module hosts the HMAC-SHA256 verifier the
+# second fuzz target attacks. We import the path dep
+# rather than the workspace `{ workspace = true }` short
+# form because the parent workspace pins the version and
+# we want the fuzz build to track the local copy in
+# `crates/argus-github-app` (not a tagged release).
+argus-github-app = { path = "../crates/argus-github-app" }
 
 # libFuzzer's nightly-only features (`#![feature(link_cfg)]`
 # and similar) are pulled in by `cargo fuzz`'s own proc macros;
