@@ -27,14 +27,20 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Duration;
 use tokio::net::TcpListener;
+// `timeout` is only used by the two signal-driven tests below;
+// both are gated to Unix. Marking the import `#[cfg(unix)]` keeps
+// the Windows build green (no `-D unused-imports` failure).
+#[cfg(unix)]
 use tokio::time::timeout;
 
 /// Serializes the signal-driven tests (see module docs).
+#[cfg(unix)]
 static SERIAL: Mutex<()> = Mutex::new(());
 
 /// Spin up a bare-bones axum server on a random localhost port, wired
 /// to the production `shutdown_signal`. Returns the bound address and
 /// the `JoinHandle` of the server task.
+#[cfg(unix)]
 async fn spawn_test_server() -> (SocketAddr, tokio::task::JoinHandle<()>) {
     let app = Router::new().route(
         "/health",
