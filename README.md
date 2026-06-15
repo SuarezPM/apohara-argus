@@ -4,6 +4,7 @@
 >
 > ARGUS is the verification infrastructure. **15 Rust crates, 4 specialists, an audit chain that's BLAKE3-hash-chained and Ed25519-signed -- EU AI Act Art. 12 Level 2 ready by default.** MIT licensed. BYOK. Zero SaaS lock-in.
 
+[![CI](https://github.com/SuarezPM/apohara-argus/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/SuarezPM/apohara-argus/actions/workflows/ci.yml)
 [![aislop score](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/SuarezPM/apohara-argus/main/aislop-score.json)](https://github.com/SuarezPM/apohara-argus/actions/workflows/aislop.yml)
 ![Rust 100%](https://img.shields.io/badge/rust-100%25-orange?logo=rust)
 ![EU AI Act Art.12](https://img.shields.io/badge/EU%20AI%20Act-Art.%2012%20L2%20ready-blue)
