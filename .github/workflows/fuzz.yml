@@ -50,6 +50,20 @@ jobs:
     name: fuzz (PR smoke, 5min/target)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # Job-level `RUSTC_BOOTSTRAP=1` so EVERY step
+      # in this job (checkout, install, build, run)
+      # inherits the override. Step-level `env:`
+      # blocks did NOT propagate to the
+      # `cargo install cargo-fuzz` subprocess
+      # (the rustix crate still failed with
+      # `cannot find attribute
+      # rustc_layout_scalar_valid_range_start`).
+      # Job-level env is the only way to make
+      # sure every `rustc` invocation in the
+      # cargo-fuzz dep tree sees the bootstrap
+      # flag.
+      RUSTC_BOOTSTRAP: '1'
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
@@ -171,13 +185,9 @@ jobs:
         run: cargo +nightly-2026-06-01 fuzz build
 
       - name: Run argus_slop_deterministic (5 min)
-        env:
-          RUSTC_BOOTSTRAP: '1'
         run: cargo +nightly-2026-06-01 fuzz run argus_slop_deterministic -- -max_total_time=300
 
       - name: Run argus_verify_signature (5 min)
-        env:
-          RUSTC_BOOTSTRAP: '1'
         run: cargo +nightly-2026-06-01 fuzz run argus_verify_signature -- -max_total_time=300
 
       # If a crash was found, libFuzzer exits with a
@@ -203,6 +213,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == 'cron'
+    env:
+      RUSTC_BOOTSTRAP: '1'
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - name: Install nightly Rust
@@ -211,20 +223,12 @@ jobs:
           toolchain: nightly-2026-06-01
           components: rust-src
       - name: Install cargo-fuzz
-        env:
-          RUSTC_BOOTSTRAP: '1'
         run: cargo +nightly-2026-06-01 install cargo-fuzz --version 0.13.1 --locked
       - name: Build fuzz targets
-        env:
-          RUSTC_BOOTSTRAP: '1'
         run: cargo +nightly-2026-06-01 fuzz build
       - name: Run argus_slop_deterministic (1 hour)
-        env:
-          RUSTC_BOOTSTRAP: '1'
         run: cargo +nightly-2026-06-01 fuzz run argus_slop_deterministic -- -max_total_time=3600
       - name: Run argus_verify_signature (1 hour)
-        env:
-          RUSTC_BOOTSTRAP: '1'
         run: cargo +nightly-2026-06-01 fuzz run argus_verify_signature -- -max_total_time=3600
       - name: Upload artifacts on failure
         if: failure()
