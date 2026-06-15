@@ -108,7 +108,7 @@ jobs:
           #     `rustc_layout_scalar_valid_range_start`
           #   error: could not compile `rustix` (lib)
           #   error: failed to compile
-          #     `cargo-fuzz v0.13.1`
+          #     `cargo-fuzz v0.13.2`
           # The `rustc_attrs` cfg flag is only set
           # when RUSTC_BOOTSTRAP is non-zero. Without
           # it, the nightly compiler rejects the
@@ -135,7 +135,7 @@ jobs:
         # reads the toolchain at install time, not at
         # run time, and embeds the path to that cargo
         # binary in itself).
-        run: cargo +nightly-2026-06-01 install cargo-fuzz --version 0.13.1 --locked
+        run: cargo +nightly-2026-06-01 install cargo-fuzz --version 0.13.2 --locked
 
       # We don't depend on the sccache cache for fuzz
       # builds (they're short, and the cache hit rate is
@@ -223,7 +223,7 @@ jobs:
           toolchain: nightly-2026-06-01
           components: rust-src
       - name: Install cargo-fuzz
-        run: cargo +nightly-2026-06-01 install cargo-fuzz --version 0.13.1 --locked
+        run: cargo +nightly-2026-06-01 install cargo-fuzz --version 0.13.2 --locked
       - name: Build fuzz targets
         run: cargo +nightly-2026-06-01 fuzz build
       - name: Run argus_slop_deterministic (1 hour)
