@@ -47,6 +47,26 @@ debug-assertions = true
 # `sanitizer-coverage` LLVM pass; that's enabled by
 # cargo-fuzz's wrapper, not here.
 
+# cargo-fuzz 0.13 requires THIS manifest (the fuzz
+# manifest itself, NOT the parent workspace) to carry
+# the `cargo-fuzz = true` opt-in marker. Without it,
+# `cargo fuzz build` errors out with:
+#   "manifest …/fuzz/Cargo.toml does not look like a
+#    cargo-fuzz manifest. Add following lines to
+#    override: [package.metadata] cargo-fuzz = true"
+# The marker tells cargo-fuzz this is a fuzz workspace
+# and disables the auto-discovery heuristics (which
+# expect a `<crate-name>-fuzz` package name and a
+# `[[bin]]` for every target in `fuzz_targets/`). The
+# previous attempt (commit 1d85059) put the marker in
+# the *parent* workspace's `[workspace.metadata]` —
+# that opt-in is for "this workspace has a fuzz
+# subdir"; the marker we're adding here is for "this
+# manifest IS a fuzz manifest". Both are needed, both
+# go in different files.
+[package.metadata]
+cargo-fuzz = true
+
 # Prevent this workspace from interfering with the parent
 # workspace's `cargo test`, `cargo clippy`, etc. The fuzz
 # targets require nightly Rust; the parent workspace pins
