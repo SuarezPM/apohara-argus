@@ -10,7 +10,12 @@
 //! installs a single process-wide signal handler, so concurrent test
 //! runs would race over the same signal stream.
 
+// The nix + axum + tokio imports below are only used by the
+// Unix-only signal tests. Gate them so the Windows build stays
+// green (no `-D unused-imports` / `-D dead-code` failures).
+#[cfg(unix)]
 use argus_verify::shutdown_signal;
+#[cfg(unix)]
 use axum::{routing::get, Json, Router};
 // The `nix` crate is Unix-only (POSIX signal + unistd). These
 // imports and the signal-driven tests that depend on them must
@@ -22,10 +27,14 @@ use axum::{routing::get, Json, Router};
 use nix::sys::signal::{kill, Signal};
 #[cfg(unix)]
 use nix::unistd::Pid;
+#[cfg(unix)]
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
+#[cfg(unix)]
 use std::sync::Mutex;
+#[cfg(unix)]
 use std::time::Duration;
+#[cfg(unix)]
 use tokio::net::TcpListener;
 // `timeout` is only used by the two signal-driven tests below;
 // both are gated to Unix. Marking the import `#[cfg(unix)]` keeps
