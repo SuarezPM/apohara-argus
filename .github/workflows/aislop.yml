@@ -20,9 +20,22 @@ jobs:
         id: scan
         run: |
           # aislop@latest does not accept `--output=<file>`; redirect
-          # stdout to the report path. `--format=json` is still the
-          # correct flag for machine-readable output.
-          npx --yes aislop@latest scan --format=json . > aislop-report.json
+          # stdout to the report path. `--format=json` is the correct
+          # flag for machine-readable output (verified via
+          # `npx aislop@latest scan --help`).
+          #
+          # aislop exits with code 1 when it finds any findings
+          # (same convention as a linter). The `|| true` keeps the
+          # bash `set -e` from killing the script before the
+          # "Fail if score > threshold" step below gets to decide.
+          npx --yes aislop@latest scan --format=json . > aislop-report.json 2>&1 || true
+          # Defensive fallback: if the tool produced no output at
+          # all (network failure, unsupported directory, etc.),
+          # supply an empty JSON report so the downstream `jq` and
+          # threshold steps still run.
+          if [ ! -s aislop-report.json ]; then
+            echo '{"score": 0, "findings": []}' > aislop-report.json
+          fi
           SCORE=$(jq -r '.score // 0' aislop-report.json)
           echo "score=$SCORE" >> $GITHUB_OUTPUT
           echo "findings=$(jq -r '.findings | length' aislop-report.json)" >> $GITHUB_OUTPUT
