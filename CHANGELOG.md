@@ -42,6 +42,103 @@ project adheres to
        a defensive empty-JSON fallback covers network /
        unsupported-directory failures.
 
+### Security
+
+- **CI was red on `main`** for 4 of the 8 `RUSTSEC`
+  advisories flagged by `cargo audit` (sqlx + 3
+  rustls-webpki). Coordinated bump of the workspace's
+  `opentelemetry` / `opentelemetry_sdk` /
+  `opentelemetry-stdout` from 0.27 → 0.32 (commits
+  `8bb783c` + `c12e6d9`-era) followed by `sqlx` 0.7 → 0.8
+  (commit `ea526b3`) cleared 7 of 8 advisories:
+  - RUSTSEC-2024-0363 (sqlx 0.7 binary protocol
+    misinterpretation) — **fixed**
+  - RUSTSEC-2026-0098 / 0099 / 0104 (rustls-webpki
+    0.101 CRL/URI/wildcard parsing) — **fixed**
+    (sqlx 0.8 pulled in rustls 0.23 + rustls-webpki 0.103)
+  - RUSTSEC-2023-0071 (rsa 0.9.10 Marvin Attack,
+    "No fixed upgrade") — **accepted risk**,
+    transitive via `sqlx-mysql` (the `mysql` feature
+    is not enabled in workspace.dependencies, so the
+    dep is dead weight in the lockfile)
+  - RUSTSEC-2024-0436 (paste 1.0.15 unmaintained) and
+    RUSTSEC-2025-0134 (rustls-pemfile 1.0.4 unmaintained)
+    — **documented as no-fix-available**; no upstream
+    replacement, no security impact, awaiting
+    maintainer action by upstream.
+
+### Changed
+
+- **Major dependency migrations** (Wave V.2, closes
+  dependabot PRs #6 + #8 and tracking issues #10 + #11):
+  - `axum` 0.7.9 → 0.8.9 (path-segment syntax:
+    `:capture` → `{capture}` per matchit 0.8)
+  - `tower` 0.4.13 → 0.5.3 (Service / Layer /
+    ServiceBuilder shape changes; consumers via axum
+    pick up 0.5 transparently)
+  - `tower-http` 0.5.2 → 0.6.11 (TraceLayer builder
+    tightened; argus-otel's Layered<OpenTelemetryLayer,
+    …> pipeline consumes without code changes)
+  - `sqlx` 0.7.4 → 0.8.6 (see Security entry above
+    for the RUSTSEC rationale)
+  - `thiserror` 1.0.69 → 2.0.18 (2.0 dropped
+    `.description()` on the generated Error impl;
+    the workspace never called it directly —
+    `grep -rn '\.description()' crates/*/src/` → 0 hits
+    — so the bump is config-only)
+  - 5 route definitions in `crates/argus-dashboard`
+    (premium.rs + main.rs) and 3 in
+    `crates/argus-github-app/tests/webhook_integration.rs`
+    (mock GitHub API) updated from `:capture` to
+    `{capture}`. Handlers that use `Path(name): Path<T>`
+    still work because the variable name binds to the
+    capture group.
+
+### Security (cont.)
+
+- **Code scanning alerts** (OpenSSF Scorecard):
+  cleared 12 of the 17 alerts surfaced in commit
+  `e3d0b15` (9 alerts) + `ea526b3` (3 transitive via
+  the sqlx bump):
+  - **PinnedDependenciesID** × 9 — 3 unpinned
+    GitHub Actions in `.github/workflows/aislop.yml`
+    pinned by full 40-char SHA hash
+    (`actions/checkout@df4cb1c0… # v6.0.3`,
+    `actions/upload-artifact@bbbca2d… # v7.0.0`,
+    `peter-evans/create-or-update-comment@71345be0…
+    # v4.0.0`); 6 unpinned Docker `FROM` directives
+    in `deploy/Dockerfile` + `crates/argus-dashboard/
+    Dockerfile` + `crates/argus-github-app/Dockerfile`
+    pinned by digest (`rust:1.88-slim@…30d89`,
+    `debian:bookworm-slim@…04716`,
+    `gcr.io/distroless/cc-debian12:nonroot@…bd985`)
+  - **TokenPermissionsID** × 2 — top-level
+    `permissions: contents: read` added to
+    `.github/workflows/aislop.yml` (the `scan` job
+    only needs read access). `release.yml` already
+    had a top-level `contents: read`; the
+    `gh-release` job keeps its explicit
+    `contents: write` override.
+  - **CIIBestPracticesID** (low) — README.md badge
+    URL replaced `XXXXX` placeholder with `13242`
+    (the project's real OpenSSF Best Practices ID).
+  The 5 remaining alerts are project-level (not code):
+  MaintainedID + CodeReviewID (self-resolve with
+  time and PR activity), FuzzingID (out of scope,
+  would need a cargo-fuzz setup), and the residual
+  Vulnerabilities / CIIBestPractices entries that
+  auto-clear on the next scan.
+
+- **Branch protection on `main`**: enabled via the
+  GitHub API. 11 required status checks (CI matrix
+  jobs + Scorecard + Bench + CodeQL + aislop +
+  cargo-deny), 1 required PR review, linear history
+  required, no force-push, no branch deletion,
+  conversation-resolution required, `enforce_admins`
+  set to `false` (single-maintainer BDFL repo —
+  the admin can push directly to main; everyone
+  else goes through PR review).
+
 - **Project governance & OpenSSF Best Practices artifacts** (Wave
   S.1): [`SECURITY.md`](SECURITY.md) (private GitHub Security
   Advisories, 5-day ack, "covers / does NOT cover" threat model
