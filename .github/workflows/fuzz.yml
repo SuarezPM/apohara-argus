@@ -81,16 +81,24 @@ jobs:
       # budget is enough for libFuzzer to either find a
       # crash or report a clean run; we don't try to maximize
       # coverage in the PR loop.
+      #
+      # IMPORTANT: cargo-fuzz resolves the manifest path
+      # as `fuzz/Cargo.toml` relative to the WORKSPACE
+      # ROOT, not relative to the cwd. Running from the
+      # default cwd (the workspace root, which is what
+      # GitHub Actions sets when no `working-directory`
+      # is specified) is the right call. An earlier
+      # version of this workflow used `working-directory:
+      # fuzz` which made cargo-fuzz look for
+      # `fuzz/fuzz/Cargo.toml` (the double-fuzz path
+      # error from the second failed run).
       - name: Build fuzz targets
-        working-directory: fuzz
         run: cargo fuzz build
 
       - name: Run argus_slop_deterministic (5 min)
-        working-directory: fuzz
         run: cargo fuzz run argus_slop_deterministic -- -max_total_time=300
 
       - name: Run argus_verify_signature (5 min)
-        working-directory: fuzz
         run: cargo fuzz run argus_verify_signature -- -max_total_time=300
 
       # If a crash was found, libFuzzer exits with a
@@ -126,13 +134,10 @@ jobs:
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz --version 0.13.1 --locked
       - name: Build fuzz targets
-        working-directory: fuzz
         run: cargo fuzz build
       - name: Run argus_slop_deterministic (1 hour)
-        working-directory: fuzz
         run: cargo fuzz run argus_slop_deterministic -- -max_total_time=3600
       - name: Run argus_verify_signature (1 hour)
-        working-directory: fuzz
         run: cargo fuzz run argus_verify_signature -- -max_total_time=3600
       - name: Upload artifacts on failure
         if: failure()
