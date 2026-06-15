@@ -77,6 +77,30 @@ jobs:
       # behavior deterministic across runs (libFuzzer
       # has subtle ABI changes between releases).
       - name: Install cargo-fuzz
+        env:
+          # `RUSTC_BOOTSTRAP=1` is REQUIRED on the
+          # install step too — not just the build
+          # step. The `cargo install cargo-fuzz`
+          # command compiles cargo-fuzz itself,
+          # which depends on `rustix v0.36.5`,
+          # which uses the nightly-only
+          # `#[cfg_attr(rustc_attrs,
+          #   rustc_layout_scalar_valid_range_start(…))]`
+          # attribute. The eleventh run of this
+          # workflow failed here (after the
+          # build-step RUSTC_BOOTSTRAP fix in 4dec557
+          # worked) with:
+          #   error: cannot find attribute
+          #     `rustc_layout_scalar_valid_range_start`
+          #   error: could not compile `rustix` (lib)
+          #   error: failed to compile
+          #     `cargo-fuzz v0.13.1`
+          # The `rustc_attrs` cfg flag is only set
+          # when RUSTC_BOOTSTRAP is non-zero. Without
+          # it, the nightly compiler rejects the
+          # attribute as "reserved for use by the
+          # rustc compiler".
+          RUSTC_BOOTSTRAP: '1'
         # `+nightly-2026-06-01` is REQUIRED here, not a
         # nice-to-have. The `+<toolchain>` syntax is
         # the cargo-wrapper's way of saying \"resolve
@@ -187,6 +211,8 @@ jobs:
           toolchain: nightly-2026-06-01
           components: rust-src
       - name: Install cargo-fuzz
+        env:
+          RUSTC_BOOTSTRAP: '1'
         run: cargo +nightly-2026-06-01 install cargo-fuzz --version 0.13.1 --locked
       - name: Build fuzz targets
         env:
