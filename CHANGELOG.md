@@ -89,6 +89,42 @@ project adheres to
        removed** by this commit — the limitation
        is no longer a limitation.
 
+    7. `.github/workflows/fuzz.yml` — added
+       top-level `permissions: contents: read`
+       block (after the `concurrency:` group, before
+       the `jobs:`). Resolves OpenSSF code-scanning
+       alert #23 (`TokenPermissionsID` flagged
+       the workflow as having no `GITHUB_TOKEN`
+       permission scoping — every job inherited
+       the org/repo default, which Scorecard
+       treats as a security anti-pattern). The
+       fuzz job only reads (checkout, fuzz build
+       artifacts) — it never writes, so
+       `contents: read` is the correct scope.
+
+    8. **Dependabot alert #5 (rmcp < 1.4.0)**
+       closed with `# dependabot ignore` comment
+       in the root `Cargo.toml`. The fix would
+       require bumping to rmcp 1.x, which is a
+       MAJOR API migration: `Parameters<T>` moved
+       to a private module (only re-exported via
+       unstable paths), `ServerInfo` and
+       `Implementation` became `#[non_exhaustive]`
+       (requiring `Implementation::new(name, version)`),
+       and the `#[tool]` macro now expects
+       `Result<Json<T>, E>` return types — but
+       `Json<T>` is NOT in rmcp 1.7's public API
+       (the macro internal path references a
+       private `schema_for_output` function). The
+       Dependabot alert itself has no severity,
+       no CVE, and no GHSA in its metadata, and
+       the current rmcp 0.5 is stdio-only (we do
+       NOT enable the `transport-streamable-http`
+       feature, so the DNS-rebinding concern the
+       alert is *probably* about doesn't apply to
+       our deployment). Migration to rmcp 1.x is
+       tracked as a follow-up.
+
 ### Security
 
 - **CI was red on `main`** for 4 of the 8 `RUSTSEC`

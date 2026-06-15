@@ -42,6 +42,17 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Read-only GITHUB_TOKEN. The fuzz job only needs
+# `contents: read` (to check out the repo and read
+# the fuzz targets); it never writes to the repo,
+# creates releases, or opens PRs. Top-level
+# `permissions: contents: read` is the OpenSSF
+# Scorecard Token-Permissions check pattern: any
+# job that needs to widen does so explicitly
+# (none of the fuzz jobs do).
+permissions:
+  contents: read
+
 jobs:
   # ------------------------------------------------------------------
   # PR smoke: 5 min per target, on every PR touching a fuzzed crate.

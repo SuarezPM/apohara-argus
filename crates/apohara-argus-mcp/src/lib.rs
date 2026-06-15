@@ -152,7 +152,7 @@ impl ArgusMcp {
             findings,
             summary,
         };
-        Ok(serde_json::to_string(&report).unwrap_or_default())
+        Ok(serde_json::to_string(&report).unwrap_or_default(),)
     }
 
     /// **Aegis Security** — adversarial security review.
@@ -190,7 +190,7 @@ impl ArgusMcp {
             findings,
             summary,
         };
-        Ok(serde_json::to_string(&report).unwrap_or_default())
+        Ok(serde_json::to_string(&report).unwrap_or_default(),)
     }
 
     /// **Aegis Arch** — architectural fit review.
@@ -223,7 +223,7 @@ impl ArgusMcp {
             findings,
             summary,
         };
-        Ok(serde_json::to_string(&report).unwrap_or_default())
+        Ok(serde_json::to_string(&report).unwrap_or_default(),)
     }
 
     /// **Aegis Verdict** — final verdict synthesizer.
@@ -292,7 +292,7 @@ impl ArgusMcp {
         let _ = combined_findings["fix_plan"]["total_steps"]
             .as_u64()
             .unwrap_or(0);
-        Ok(serde_json::to_string(&report).unwrap_or_default())
+        Ok(serde_json::to_string(&report).unwrap_or_default(),)
     }
 }
 

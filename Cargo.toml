@@ -166,6 +166,38 @@ tracing-opentelemetry = "0.33"
 # server), we'll need to bump rmcp to a version that
 # patches the DNS-rebinding vector and add explicit
 # `Host` header allow-listing at startup.
+# Dependabot alert #5: rmcp < 1.4.0 has a Dependabot advisory
+# (no CVE / no GHSA / no severity in the alert metadata).
+# The fix would require bumping to rmcp 1.x, which is a
+# MAJOR API migration:
+#   * `Parameters<T>` moved from `handler::server::tool`
+#     to `handler::server::wrapper::parameters` (the
+#     module is private — only re-exported via
+#     `wrapper::*`, but the public path is unstable
+#     across 1.x patch releases)
+#   * `ServerInfo` and `Implementation` became
+#     `#[non_exhaustive]` struct expressions — we have
+#     to switch to `Implementation::new(name, version)`
+#   * The `#[tool]` macro signature changed: the
+#     macro extracts a JSON schema from the return
+#     type expecting `Result<Json<T>, E>`, but
+#     `Json<T>` is not in rmcp 1.7's public API
+#     (the macro internal path is
+#     `rmcp::handler::server::tool::schema_for_output`
+#     but the type `Json` is private)
+#   * `IntoToolRoute<ArgusMcp, _>` is not implemented
+#     for the 4 tool functions in 1.7 — the `#[tool]`
+#     macro's generated `CallToolHandler` impl fails
+#     silently
+# The current rmcp 0.5 works correctly for our use
+# case (stdio-only MCP server exposing 4 specialists
+# via `ServiceExt::serve(stdio())`). No security
+# impact: the apohara-argus-mcp server is offline-
+# first and BYOK, no HTTP transport is enabled
+# (we do NOT set the `transport-streamable-http`
+# feature, so the rmcp DNS-rebinding concern in
+# the alert doesn't apply). Tracking the migration
+# to rmcp 1.x in a follow-up session.
 rmcp = { version = "0.5", features = ["server", "transport-io", "macros"] }
 schemars = "1"
 chrono = { version = "0.4", features = ["serde"] }
