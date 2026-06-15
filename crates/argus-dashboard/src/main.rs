@@ -653,7 +653,7 @@ fn render_samples_grid() -> String {
                      (no findings)</p>",
                 );
             }
-            for (_li, l) in layers.iter().enumerate() {
+            for l in &layers {
                 let sev = l.get("severity").and_then(|v| v.as_str()).unwrap_or("info");
                 let summary = l.get("summary").and_then(|v| v.as_str()).unwrap_or("");
                 let file = l.get("file").and_then(|v| v.as_str()).unwrap_or("");
@@ -1298,8 +1298,7 @@ a{color:#06c}.help{color:#888;font-size:13px}</style>
 /// `/api/analyze-snippet` and the 4-cohort verdict is rendered inline.
 /// Pure SSR + minimal JS, matching the rest of the apohara.dev style.
 fn render_analyzer_page() -> String {
-    format!(
-        r##"<!DOCTYPE html>
+    r##"<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -1458,8 +1457,7 @@ export function charge(amount) {{
     }});
   </script>
 </body>
-</html>"##
-    )
+</html>"##.to_string()
 }
 
 // ============================================================================
@@ -1974,7 +1972,7 @@ mod tests {
             .iter()
             .find(|c| c["id"] == "security")
             .unwrap();
-        assert!(sec["layers"].as_array().unwrap().len() >= 1);
+        assert!(!sec["layers"].as_array().unwrap().is_empty());
     }
 
     #[test]
