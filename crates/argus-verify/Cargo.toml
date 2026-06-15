@@ -55,4 +55,4 @@ sqlx = { workspace = true, features = ["sqlite", "migrate"] }
 # process without spawning a child. The cargo test binary IS the
 # server, so we send the signal to ourselves and expect the
 # graceful-shutdown future to fire.
-nix = { version = "0.29", features = ["signal"] }
+nix = { version = "0.31", features = ["signal"] }
