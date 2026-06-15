@@ -102,28 +102,48 @@ project adheres to
        artifacts) — it never writes, so
        `contents: read` is the correct scope.
 
-    8. **Dependabot alert #5 (rmcp < 1.4.0)**
-       closed with `# dependabot ignore` comment
-       in the root `Cargo.toml`. The fix would
-       require bumping to rmcp 1.x, which is a
-       MAJOR API migration: `Parameters<T>` moved
-       to a private module (only re-exported via
-       unstable paths), `ServerInfo` and
-       `Implementation` became `#[non_exhaustive]`
-       (requiring `Implementation::new(name, version)`),
-       and the `#[tool]` macro now expects
-       `Result<Json<T>, E>` return types — but
-       `Json<T>` is NOT in rmcp 1.7's public API
-       (the macro internal path references a
-       private `schema_for_output` function). The
-       Dependabot alert itself has no severity,
-       no CVE, and no GHSA in its metadata, and
-       the current rmcp 0.5 is stdio-only (we do
-       NOT enable the `transport-streamable-http`
-       feature, so the DNS-rebinding concern the
-       alert is *probably* about doesn't apply to
-       our deployment). Migration to rmcp 1.x is
-       tracked as a follow-up.
+    8. **rmcp 0.5 → 1.7 migration** in
+       `crates/apohara-argus-mcp/`. Closes
+       **Dependabot alert #5** (CVE-2026-42559,
+       GHSA-89vp-x53w-74fx, CVSS 8.8 HIGH) — the
+       Streamable HTTP transport DNS-rebinding
+       vulnerability. The alert was initially
+       dismissed with `not_used` (defensible:
+       our MCP server is stdio-only, and the
+       advisory says non-HTTP transports are not
+       affected) but the user asked to do the
+       real fix. Migration scope: (a) bump the
+       workspace dep to rmcp 1.4 (cargo resolves
+       to 1.7); (b) `Parameters<T>` is now
+       re-exported via `handler::server::
+       wrapper::Parameters` (the underlying
+       `wrapper::parameters` module is private);
+       (c) tool functions return
+       `Result<Json<SpecialistReport>, ErrorData>`
+       instead of `Result<String, ErrorData>` —
+       the `Json<T>` wrapper is in the crate
+       root (`use rmcp::Json;`); (d)
+       `SpecialistReport` now derives
+       `schemars::JsonSchema` so the `#[tool]`
+       macro can extract the output schema;
+       (e) `get_info()` switched to the builder
+       pattern (`ServerInfo::new(capabilities)
+       .with_server_info(Implementation::new
+       ("ARGUS", CARGO_PKG_VERSION))
+       .with_instructions(...)`) because
+       `InitializeResult` (= `ServerInfo`) and
+       `Implementation` are `#[non_exhaustive]`
+       in 1.7 — struct expression syntax
+       doesn't work for external crates even
+       with `..Default::default()`; (f) the
+       test `server_info_advertises_four_specialists`
+       got the same builder refactor. 201/201
+       unit + integration tests pass, 182/182
+       benchmark + lib tests pass, clippy clean
+       (`-D warnings`), fmt clean. The
+       `# dependabot ignore` comment that
+       f6b3a88 added to root `Cargo.toml` is
+       removed (no longer needed).
 
 ### Security
 

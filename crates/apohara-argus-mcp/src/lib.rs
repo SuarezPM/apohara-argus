@@ -14,21 +14,25 @@
 //! The NIM key is read from `ARGUS_NIM_KEY` env var per call (BYOK).
 //! No key → tool returns a structured error rather than crashing.
 
-use std::future::Future;
 use std::time::Instant;
 
 use argus_llm::NimClient;
 use argus_slop::pipeline::AnalysisPipeline;
 use argus_slop::{Analyzer, ArchitectureFit, SecurityReview, SlopDetector};
 use rmcp::{
-    handler::server::{router::tool::ToolRouter, tool::Parameters},
+    handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::ServerInfo,
-    tool, tool_handler, tool_router, ErrorData, ServerHandler,
+    tool, tool_handler, tool_router, ErrorData, Json, ServerHandler,
 };
 use serde::{Deserialize, Serialize};
 
 /// Per-tool result envelope. Returned to the MCP client as JSON.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// In rmcp 1.7 the `#[tool]` macro extracts a JSON
+/// schema from the return type via `Json<T>`; for
+/// the schema to be published, T must implement
+/// `schemars::JsonSchema` (which `SpecialistReport`
+/// does via the `JsonSchema` derive below).
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct SpecialistReport {
     /// Which specialist produced this report.
     pub specialist: String,
@@ -66,7 +70,12 @@ pub struct ArgusMcp {
     /// Default model for the specialists. In a future iteration this
     /// could be a per-specialist model registry.
     model_id: String,
-    /// The MCP tool router. Populated by `#[tool_router]`.
+    /// The MCP tool router. Populated by `#[tool_router]`,
+    /// consumed by the `#[tool_handler]` macro in
+    /// `get_info()`-style impls. The compiler can't
+    /// see the macro's internal access, so the field
+    /// looks "never read" without the explicit allow.
+    #[allow(dead_code)]
     tool_router: ToolRouter<Self>,
 }
 
@@ -128,7 +137,7 @@ impl ArgusMcp {
     async fn aegis_slop(
         &self,
         Parameters(AegisArgs { code_diff }): Parameters<AegisArgs>,
-    ) -> Result<String, ErrorData> {
+    ) -> Result<Json<SpecialistReport>, ErrorData> {
         let key = self
             .current_key()
             .ok_or_else(|| Self::err("aegis_slop", "ARGUS_NIM_KEY not set (BYOK required)"))?;
@@ -152,7 +161,7 @@ impl ArgusMcp {
             findings,
             summary,
         };
-        Ok(serde_json::to_string(&report).unwrap_or_default(),)
+        Ok(Json(report))
     }
 
     /// **Aegis Security** — adversarial security review.
@@ -165,7 +174,7 @@ impl ArgusMcp {
     async fn aegis_security(
         &self,
         Parameters(AegisArgs { code_diff }): Parameters<AegisArgs>,
-    ) -> Result<String, ErrorData> {
+    ) -> Result<Json<SpecialistReport>, ErrorData> {
         let key = self
             .current_key()
             .ok_or_else(|| Self::err("aegis_security", "ARGUS_NIM_KEY not set (BYOK required)"))?;
@@ -190,7 +199,7 @@ impl ArgusMcp {
             findings,
             summary,
         };
-        Ok(serde_json::to_string(&report).unwrap_or_default(),)
+        Ok(Json(report))
     }
 
     /// **Aegis Arch** — architectural fit review.
@@ -203,7 +212,7 @@ impl ArgusMcp {
     async fn aegis_arch(
         &self,
         Parameters(AegisArgs { code_diff }): Parameters<AegisArgs>,
-    ) -> Result<String, ErrorData> {
+    ) -> Result<Json<SpecialistReport>, ErrorData> {
         let key = self
             .current_key()
             .ok_or_else(|| Self::err("aegis_arch", "ARGUS_NIM_KEY not set (BYOK required)"))?;
@@ -223,7 +232,7 @@ impl ArgusMcp {
             findings,
             summary,
         };
-        Ok(serde_json::to_string(&report).unwrap_or_default(),)
+        Ok(Json(report))
     }
 
     /// **Aegis Verdict** — final verdict synthesizer.
@@ -243,7 +252,7 @@ impl ArgusMcp {
             arch,
             diff,
         }): Parameters<VerdictArgs>,
-    ) -> Result<String, ErrorData> {
+    ) -> Result<Json<SpecialistReport>, ErrorData> {
         let key = self
             .current_key()
             .ok_or_else(|| Self::err("aegis_verdict", "ARGUS_NIM_KEY not set (BYOK required)"))?;
@@ -292,27 +301,34 @@ impl ArgusMcp {
         let _ = combined_findings["fix_plan"]["total_steps"]
             .as_u64()
             .unwrap_or(0);
-        Ok(serde_json::to_string(&report).unwrap_or_default(),)
+        Ok(Json(report))
     }
 }
 
 #[tool_handler]
 impl ServerHandler for ArgusMcp {
     fn get_info(&self) -> ServerInfo {
-        ServerInfo {
-            protocol_version: rmcp::model::ProtocolVersion::default(),
-            capabilities: rmcp::model::ServerCapabilities::default(),
-            server_info: rmcp::model::Implementation {
-                name: "ARGUS".into(),
-                version: env!("CARGO_PKG_VERSION").into(),
-            },
-            instructions: Some(
+        // rmcp 1.7 made `ServerInfo` (= `InitializeResult`)
+        // and `Implementation` `#[non_exhaustive]` —
+        // external crates cannot use struct expression
+        // syntax on them. The public API is the builder
+        // pattern: `ServerInfo::new(capabilities)` returns
+        // a `Self` with sensible defaults (ProtocolVersion
+        // from the current MCP spec, Implementation from
+        // CARGO_CRATE_NAME / CARGO_PKG_VERSION env vars
+        // via `Implementation::from_build_env()`), and
+        // `.with_server_info(...)` / `.with_instructions(...)`
+        // let us override the bits we care about.
+        ServerInfo::new(rmcp::model::ServerCapabilities::default())
+            .with_server_info(rmcp::model::Implementation::new(
+                "ARGUS",
+                env!("CARGO_PKG_VERSION"),
+            ))
+            .with_instructions(
                 "ARGUS — AI slop defense layer. 4 specialists exposed as MCP tools: \
                  aegis_slop, aegis_security, aegis_arch, aegis_verdict. \
-                 BYOK — pass your NVIDIA NIM key as ARGUS_NIM_KEY."
-                    .into(),
-            ),
-        }
+                 BYOK — pass your NVIDIA NIM key as ARGUS_NIM_KEY.",
+            )
     }
 }
 
@@ -402,15 +418,12 @@ mod tests {
 
     #[test]
     fn server_info_advertises_four_specialists() {
-        let info = ServerInfo {
-            protocol_version: rmcp::model::ProtocolVersion::default(),
-            capabilities: rmcp::model::ServerCapabilities::default(),
-            server_info: rmcp::model::Implementation {
-                name: "ARGUS".into(),
-                version: env!("CARGO_PKG_VERSION").into(),
-            },
-            instructions: Some("test".into()),
-        };
+        let info = ServerInfo::new(rmcp::model::ServerCapabilities::default())
+            .with_server_info(rmcp::model::Implementation::new(
+                "ARGUS",
+                env!("CARGO_PKG_VERSION"),
+            ))
+            .with_instructions("test");
         assert_eq!(info.server_info.name, "ARGUS");
         assert!(info.instructions.is_some());
     }
