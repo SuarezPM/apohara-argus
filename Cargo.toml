@@ -42,7 +42,7 @@ repository = "https://github.com/SuarezPM/apohara-argus"
 homepage = "https://github.com/SuarezPM/apohara-argus"
 documentation = "https://docs.rs/apohara-argus-cli"
 readme = "README.md"
-keywords = ["ai", "code-review", "mcp", "eu-ai-act", "byok", "rust"]
+keywords = ["ai", "code-review", "mcp", "eu-ai-act", "byok"]
 categories = ["command-line-utilities", "development-tools::cargo-plugins", "api-bindings"]
 
 [workspace.dependencies]
