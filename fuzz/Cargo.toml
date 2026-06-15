@@ -41,6 +41,34 @@ argus-github-app = { path = "../crates/argus-github-app" }
 # macro and `Arbitrary` derive.
 libfuzzer-sys = "0.4"
 
+# Declare each fuzz target as a `[[bin]]` entry.
+# The `[package.metadata] cargo-fuzz = true` opt-in
+# added above bypasses cargo-fuzz's auto-discovery
+# heuristics (the heuristics look for a
+# `<crate-name>-fuzz` package name and assume each
+# `fuzz_targets/*.rs` is a binary by convention), so
+# we have to declare the targets explicitly.
+#
+# Without these `[[bin]]` blocks, `cargo build
+# --manifest-path fuzz/Cargo.toml --bins` (the command
+# cargo-fuzz uses internally) fails with:
+#   error: failed to parse manifest at `fuzz/Cargo.toml`
+#   Caused by:
+#     no targets specified in the manifest
+#     either src/lib.rs, src/main.rs, a [lib] section,
+#     or [[bin]] section must be present
+#
+# The bin `name` is what `cargo fuzz run <name>` matches
+# against. The `path` is relative to the fuzz manifest
+# (i.e. `fuzz/fuzz_targets/<file>.rs`).
+[[bin]]
+name = "argus_slop_deterministic"
+path = "fuzz_targets/argus_slop_deterministic.rs"
+
+[[bin]]
+name = "argus_verify_signature"
+path = "fuzz_targets/argus_verify_signature.rs"
+
 [profile.release]
 debug-assertions = true
 # libFuzzer's coverage instrumentation needs the
