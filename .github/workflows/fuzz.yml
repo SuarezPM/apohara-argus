@@ -77,29 +77,27 @@ jobs:
       # behavior deterministic across runs (libFuzzer
       # has subtle ABI changes between releases).
       - name: Install cargo-fuzz
-        env:
-          # Force the nightly toolchain for the `cargo
-          # install` invocation. Without this, the
-          # `cargo` binary on PATH resolves to the
-          # *default* toolchain (whatever `rustup
-          # default` points at — usually stable from
-          # the runner image), and `cargo install
-          # cargo-fuzz` builds cargo-fuzz with stable.
-          # That's fine for the install itself, but
-          # the cargo-fuzz *binary* it produces
-          # embeds the path to the cargo that built
-          # it, so subsequent `cargo fuzz build`
-          # invocations also go through that stable
-          # cargo. Stable cargo rejects the
-          # `-Zsanitizer=address` flag cargo-fuzz
-          # injects into RUSTFLAGS with:
-          #   error: the option `Z` is only accepted
-          #     on the nightly compiler
-          # Setting `RUSTUP_TOOLCHAIN` env on the
-          # install step makes the installed binary
-          # use nightly cargo for the fuzz build.
-          RUSTUP_TOOLCHAIN: nightly-2026-06-01
-        run: cargo install cargo-fuzz --version 0.13.1 --locked
+        # `+nightly-2026-06-01` is REQUIRED here, not a
+        # nice-to-have. The `+<toolchain>` syntax is
+        # the cargo-wrapper's way of saying \"resolve
+        # `cargo` to the nightly toolchain for this
+        # invocation\". Without it, the `cargo` binary
+        # on PATH is the runner-image default (stable),
+        # and `cargo install cargo-fuzz` builds the
+        # cargo-fuzz *binary* with stable cargo. The
+        # stable-built cargo-fuzz then spawns its own
+        # `cargo build` with RUSTFLAGS=`-Zsanitizer=
+        # address` (a nightly-only flag), and stable
+        # cargo rejects it with:
+        #   error: the option `Z` is only accepted on
+        #     the nightly compiler
+        # which is what the eighth run of this workflow
+        # actually failed on (the `RUSTUP_TOOLCHAIN` env
+        # override alone was not enough — cargo-fuzz
+        # reads the toolchain at install time, not at
+        # run time, and embeds the path to that cargo
+        # binary in itself).
+        run: cargo +nightly-2026-06-01 install cargo-fuzz --version 0.13.1 --locked
 
       # We don't depend on the sccache cache for fuzz
       # builds (they're short, and the cache hit rate is
@@ -119,26 +117,20 @@ jobs:
       # `fuzz/fuzz/Cargo.toml` (the double-fuzz path
       # error from the second failed run).
       #
-      # Same RUSTUP_TOOLCHAIN override as above: the
-      # `cargo fuzz build` and `cargo fuzz run`
-      # subcommands shell out to the cargo that was
-      # on PATH when the cargo-fuzz binary was built.
-      # If that cargo is stable, the build rejects
-      # the nightly-only RUSTFLAGS.
+      # Same `+nightly-2026-06-01` override as the
+      # install step above: the `cargo` binary
+      # resolved by the `cargo +nightly-2026-06-01`
+      # wrapper IS the nightly toolchain's cargo,
+      # so the `-Zsanitizer=address` RUSTFLAGS that
+      # cargo-fuzz injects are accepted.
       - name: Build fuzz targets
-        env:
-          RUSTUP_TOOLCHAIN: nightly-2026-06-01
-        run: cargo fuzz build
+        run: cargo +nightly-2026-06-01 fuzz build
 
       - name: Run argus_slop_deterministic (5 min)
-        env:
-          RUSTUP_TOOLCHAIN: nightly-2026-06-01
-        run: cargo fuzz run argus_slop_deterministic -- -max_total_time=300
+        run: cargo +nightly-2026-06-01 fuzz run argus_slop_deterministic -- -max_total_time=300
 
       - name: Run argus_verify_signature (5 min)
-        env:
-          RUSTUP_TOOLCHAIN: nightly-2026-06-01
-        run: cargo fuzz run argus_verify_signature -- -max_total_time=300
+        run: cargo +nightly-2026-06-01 fuzz run argus_verify_signature -- -max_total_time=300
 
       # If a crash was found, libFuzzer exits with a
       # non-zero status and the artifact `crash-<id>` is
@@ -171,21 +163,13 @@ jobs:
           toolchain: nightly-2026-06-01
           components: rust-src
       - name: Install cargo-fuzz
-        env:
-          RUSTUP_TOOLCHAIN: nightly-2026-06-01
-        run: cargo install cargo-fuzz --version 0.13.1 --locked
+        run: cargo +nightly-2026-06-01 install cargo-fuzz --version 0.13.1 --locked
       - name: Build fuzz targets
-        env:
-          RUSTUP_TOOLCHAIN: nightly-2026-06-01
-        run: cargo fuzz build
+        run: cargo +nightly-2026-06-01 fuzz build
       - name: Run argus_slop_deterministic (1 hour)
-        env:
-          RUSTUP_TOOLCHAIN: nightly-2026-06-01
-        run: cargo fuzz run argus_slop_deterministic -- -max_total_time=3600
+        run: cargo +nightly-2026-06-01 fuzz run argus_slop_deterministic -- -max_total_time=3600
       - name: Run argus_verify_signature (1 hour)
-        env:
-          RUSTUP_TOOLCHAIN: nightly-2026-06-01
-        run: cargo fuzz run argus_verify_signature -- -max_total_time=3600
+        run: cargo +nightly-2026-06-01 fuzz run argus_verify_signature -- -max_total_time=3600
       - name: Upload artifacts on failure
         if: failure()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
