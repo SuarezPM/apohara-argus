@@ -13,6 +13,8 @@ on:
       - 'crates/argus-verify/**'
       - 'crates/argus-otel/**'
       - 'fuzz/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
       - '.github/workflows/fuzz.yml'
   push:
     branches: [main]
@@ -21,6 +23,8 @@ on:
       - 'crates/argus-verify/**'
       - 'crates/argus-otel/**'
       - 'fuzz/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
       - '.github/workflows/fuzz.yml'
   # Weekly full-corpus sweep to find regressions that
   # the per-PR 10-minute window missed. The job is
