@@ -21,13 +21,6 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
-# Read-only by default. The `attest` job widens to id-token/attestations
-# write so the SLSA L3 keyless signing + attestation write can work. The
-# build job intentionally does NOT hold signing scopes (SLSA L3 isolation:
-# the build cannot influence its own provenance).
-permissions:
-  contents: read
-
 permissions:
   contents: write  # required for gh-release job (creates GitHub Releases)
 
