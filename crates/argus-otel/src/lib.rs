@@ -13,7 +13,7 @@
 
 use opentelemetry::trace::TracerProvider as _;
 use opentelemetry::KeyValue;
-use opentelemetry_sdk::trace::{Config as SdkTraceConfig, TracerProvider};
+use opentelemetry_sdk::trace::SdkTracerProvider;
 use opentelemetry_sdk::Resource;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -28,7 +28,7 @@ const SERVICE_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// The shutdown call is best-effort — it blocks for up to 1s to flush
 /// any pending spans to stdout.
 pub struct TelemetryGuard {
-    provider: TracerProvider,
+    provider: SdkTracerProvider,
 }
 
 /// `true` when the user has explicitly disabled OTel for this run.
@@ -45,20 +45,37 @@ pub fn is_disabled() -> bool {
 ///
 /// Safe to call multiple times — subsequent calls are no-ops (the
 /// tracing subscriber is global state and we use `try_init`).
-#[allow(deprecated)] // SdkTraceConfig::with_resource — full Builder migration tracked separately.
 pub fn init(service_label: &str) -> Option<TelemetryGuard> {
     if is_disabled() {
         return None;
     }
 
     let exporter = opentelemetry_stdout::SpanExporter::default();
-    let provider = TracerProvider::builder()
-        .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
-        .with_config(SdkTraceConfig::default().with_resource(Resource::new(vec![
-            KeyValue::new("service.name", SERVICE_NAME),
-            KeyValue::new("service.version", SERVICE_VERSION),
-            KeyValue::new("service.component", service_label.to_string()),
-        ])))
+    // opentelemetry_sdk 0.32 renamed `TracerProvider` →
+    // `SdkTracerProvider` (the bare name is now a trait). The
+    // resource builder moved to `Resource::builder().with_attributes(
+    // …).build()` (the old `Resource::new()` constructor is
+    // `pub(crate)` in 0.32, so a public builder is the only path
+    // forward). The `with_config(Config::default().with_resource(
+    // …))` chain collapses into a direct `with_resource(…)` on
+    // the provider builder — Config is now an internal detail
+    // and the public surface is the provider's own builder.
+    // The runtime argument on `with_batch_exporter` is gone in
+    // 0.32: the batch span processor is now async by default and
+    // uses the runtime selected by the `rt-tokio` / `rt-tokio-current-thread`
+    // / `rt-spawned` features on the `opentelemetry_sdk` crate
+    // (we keep `rt-tokio` enabled in workspace.dependencies).
+    let provider = SdkTracerProvider::builder()
+        .with_batch_exporter(exporter)
+        .with_resource(
+            Resource::builder()
+                .with_attributes(vec![
+                    KeyValue::new("service.name", SERVICE_NAME),
+                    KeyValue::new("service.version", SERVICE_VERSION),
+                    KeyValue::new("service.component", service_label.to_string()),
+                ])
+                .build(),
+        )
         .build();
     let tracer = provider.tracer(service_label.to_string());
 

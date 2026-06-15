@@ -79,9 +79,23 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 # OpenTelemetry [Refs: 6.3] — stdout exporter, no external collector
 # needed. Use the official `opentelemetry` and `opentelemetry_sdk` crates,
 # pinned to the same minor to avoid the API churn across versions.
-opentelemetry = "0.27"
-opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
-opentelemetry-stdout = { version = "0.27", features = ["trace"] }
+#
+# 0.32 (not 0.27) is required by `tracing-opentelemetry 0.33`. The 0.27
+# pin was the right call when `tracing-opentelemetry` was 0.28 (the old
+# minor) but dependabot PR #7 bumped the tracing-opentelemetry minor
+# without a coordinated bump of the underlying opentelemetry stack, which
+# produces a lockfile with two `opentelemetry` majors (0.27.1 used by
+# `argus-otel` itself, 0.32.0 pulled in by tracing-opentelemetry 0.33).
+# That double-version is what broke the `try_init()` call in
+# `argus-otel/src/lib.rs:78-82` — the `OpenTelemetryLayer<S, T>` from
+# 0.33 carries a different T than the `provider.tracer()` return type
+# from 0.27, so the `Layered<OpenTelemetryLayer<…>, …>` chain loses its
+# `Into<Dispatch>` / `SubscriberInitExt` impl. Aligning to 0.32 across
+# the workspace makes both crates see the same `Tracer` type and
+# restores the trait chain.
+opentelemetry = "0.32"
+opentelemetry_sdk = { version = "0.32", features = ["rt-tokio"] }
+opentelemetry-stdout = { version = "0.32", features = ["trace"] }
 tracing-opentelemetry = "0.33"
 
 # MCP (Model Context Protocol) — official Rust SDK.
