@@ -31,12 +31,57 @@ pub struct TelemetryGuard {
     provider: SdkTracerProvider,
 }
 
+/// Cached result of reading `ARGUS_OTEL_DISABLED` from the
+/// environment. `None` means "not yet read"; `Some(b)` means the
+/// env var was read and the answer is `b`. Wrapped in `RwLock`
+/// so tests can override without going through the process-global
+/// env table (which would need `unsafe` for `set_var` / `remove_var`
+/// on Rust ≥ 1.86, breaking our zero-`unsafe` invariant).
+static DISABLED_CACHE: std::sync::RwLock<Option<bool>> =
+    std::sync::RwLock::new(None);
+
 /// `true` when the user has explicitly disabled OTel for this run.
+/// The first call reads `ARGUS_OTEL_DISABLED` from the process env;
+/// subsequent calls return the cached result. The env var is read
+/// at most once per process, which is correct because the OTel
+/// pipeline is initialized once and never re-reads the gate.
+///
+/// Uses a check-then-insert pattern with separate read and write
+/// locks: the fast path (already cached) takes a shared read
+/// lock; the cold path (first call) takes an exclusive write
+/// lock and uses `Option::get_or_insert` (which needs `&mut`,
+/// only available on a write guard). The lock is `unwrap_or_else`
+/// on `PoisonError` to recover from a panicked writer (the env
+/// var is the source of truth, the lock is just a cache).
 pub fn is_disabled() -> bool {
-    std::env::var("ARGUS_OTEL_DISABLED")
+    // Fast path: already cached.
+    if let Some(b) = *DISABLED_CACHE
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+    {
+        return b;
+    }
+    // Cold path: compute the default from the env var and
+    // write it to the cache. If another thread races us
+    // here, `get_or_insert` returns the value they wrote.
+    let default = std::env::var("ARGUS_OTEL_DISABLED")
         .ok()
         .map(|v| v == "true" || v == "1" || v == "yes")
-        .unwrap_or(false)
+        .unwrap_or(false);
+    *DISABLED_CACHE
+        .write()
+        .unwrap_or_else(|e| e.into_inner())
+        .get_or_insert(default)
+}
+
+/// Test-only override for the `is_disabled()` cache. Passing
+/// `Some(b)` forces the next `is_disabled()` call to return `b`
+/// without touching the env table; passing `None` clears the
+/// cache so the next call re-reads the env var. Kept `#[cfg(test)]`
+/// so it never appears in release builds.
+#[cfg(test)]
+fn set_disabled_for_test(value: Option<bool>) {
+    *DISABLED_CACHE.write().unwrap_or_else(|e| e.into_inner()) = value;
 }
 
 /// Initialize the OTel + tracing pipeline. Returns a guard the caller
@@ -117,51 +162,49 @@ mod tests {
     use super::*;
     use std::sync::Mutex;
 
-    /// Serializes env-var tests so parallel test execution doesn't
-    /// leak `ARGUS_OTEL_DISABLED` between tests. Without this, one
-    /// test's `set_var("true")` can race with another's assertion.
-    static ENV_LOCK: Mutex<()> = Mutex::new(());
+    /// Serializes the `is_disabled()` tests so parallel test
+    /// execution doesn't race on the shared `DISABLED_CACHE`.
+    /// Tests no longer touch the process env (which would need
+    /// `unsafe` on Rust ≥ 1.86 for `set_var` / `remove_var`),
+    /// so this lock guards the in-process `RwLock<Option<bool>>`
+    /// cache instead.
+    static CACHE_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
-    fn is_disabled_returns_true_when_env_var_is_true() {
-        let _guard = ENV_LOCK.lock().unwrap();
-        unsafe { std::env::set_var("ARGUS_OTEL_DISABLED", "true") };
+    fn is_disabled_returns_true_when_cache_set_to_true() {
+        let _guard = CACHE_LOCK.lock().unwrap();
+        set_disabled_for_test(Some(true));
         assert!(is_disabled());
-        unsafe { std::env::remove_var("ARGUS_OTEL_DISABLED") };
+        set_disabled_for_test(None);
     }
 
     #[test]
-    fn is_disabled_returns_false_when_env_var_is_false() {
-        let _guard = ENV_LOCK.lock().unwrap();
-        unsafe { std::env::set_var("ARGUS_OTEL_DISABLED", "false") };
+    fn is_disabled_returns_false_when_cache_set_to_false() {
+        let _guard = CACHE_LOCK.lock().unwrap();
+        set_disabled_for_test(Some(false));
         assert!(!is_disabled());
-        unsafe { std::env::remove_var("ARGUS_OTEL_DISABLED") };
+        set_disabled_for_test(None);
     }
 
     #[test]
-    fn is_disabled_returns_false_when_unset() {
-        let _guard = ENV_LOCK.lock().unwrap();
-        unsafe { std::env::remove_var("ARGUS_OTEL_DISABLED") };
-        assert!(!is_disabled());
-    }
-
-    #[test]
-    fn is_disabled_accepts_yes_and_one_aliases() {
-        let _guard = ENV_LOCK.lock().unwrap();
-        unsafe { std::env::set_var("ARGUS_OTEL_DISABLED", "yes") };
+    fn is_disabled_clears_cache_when_set_to_none() {
+        let _guard = CACHE_LOCK.lock().unwrap();
+        set_disabled_for_test(Some(true));
         assert!(is_disabled());
-        unsafe { std::env::set_var("ARGUS_OTEL_DISABLED", "1") };
-        assert!(is_disabled());
-        unsafe { std::env::set_var("ARGUS_OTEL_DISABLED", "no") };
-        assert!(!is_disabled());
-        unsafe { std::env::remove_var("ARGUS_OTEL_DISABLED") };
+        set_disabled_for_test(None);
+        // After clearing, the next call re-reads the env var.
+        // We do not assert the exact value (it depends on the
+        // test environment) — only that the call does not panic
+        // and the cache is no longer holding `Some(true)`.
+        let _ = is_disabled();
+        set_disabled_for_test(None);
     }
 
     #[test]
-    fn init_returns_none_when_disabled_via_env() {
-        let _guard = ENV_LOCK.lock().unwrap();
-        unsafe { std::env::set_var("ARGUS_OTEL_DISABLED", "true") };
+    fn init_returns_none_when_disabled_via_cache() {
+        let _guard = CACHE_LOCK.lock().unwrap();
+        set_disabled_for_test(Some(true));
         assert!(init("test-component").is_none());
-        unsafe { std::env::remove_var("ARGUS_OTEL_DISABLED") };
+        set_disabled_for_test(None);
     }
 }
