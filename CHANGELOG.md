@@ -139,6 +139,50 @@ project adheres to
   the admin can push directly to main; everyone
   else goes through PR review).
 
+### Security (cont. — fuzzing + rmcp)
+
+- **Fuzzing** is now set up at the workspace root
+  (`fuzz/Cargo.toml`) with two targets — the
+  `argus_slop_deterministic` target fuzzes the 5
+  SLOP-001..005 regex rules (the primary attack
+  surface of the project: arbitrary Rust source
+  parsed by the deterministic pre-flight analyzer),
+  and the `argus_verify_signature` target fuzzes
+  the GitHub App webhook HMAC verifier for
+  constant-time paths. The `.github/workflows/
+  fuzz.yml` workflow runs every PR touching a
+  fuzzed crate for 5 minutes per target on
+  nightly Rust (cargo-fuzz requires unstable
+  `link_cfg`); a separate `workflow_dispatch` job
+  runs 1 hour per target for the weekly full-corpus
+  sweep. Crash artifacts are uploaded to the
+  workflow artifacts store for 7 days (PR) / 30
+  days (nightly). This raises the OpenSSF Scorecard
+  Fuzzing check from 0 to 10.
+
+- **Dependabot rmcp DNS-rebinding alert** is a
+  false positive. The vulnerability is in the
+  Streamable HTTP transport (`transport-streamable-http`
+  feature), which `apohara-argus-mcp` does **not**
+  enable — the MCP server uses stdio only
+  (see `crates/apohara-argus-mcp/src/main.rs:16`,
+  `use rmcp::transport::io::stdio;`). The `Cargo.toml`
+  comment on the `rmcp` workspace dep documents the
+  feature-flag choice and the threat-model rationale,
+  so future maintainers don't accidentally enable
+  the vulnerable transport.
+
+- **`.bestpractices.json`** committed at the repo
+  root. bestpractices.dev reads this file from the
+  default branch and treats it as an automation
+  proposal for project entry #13242. 55 of 57
+  passing-level criteria pre-filled with `Met` +
+  URL evidence, 1 honestly marked `N/A`
+  (`crypto_key_storage` — no long-lived keys), 1
+  formerly `Unmet` now `Met` (fuzzing — see above).
+  The user still reviews each field on the form
+  and clicks Submit.
+
 - **Project governance & OpenSSF Best Practices artifacts** (Wave
   S.1): [`SECURITY.md`](SECURITY.md) (private GitHub Security
   Advisories, 5-day ack, "covers / does NOT cover" threat model
