@@ -1,0 +1,6 @@
+interface:
+  display_name: "Apohara Argus"
+  short_description: "Repo-specific patterns and workflows for apohara-argus"
+  default_prompt: "Use the apohara-argus repo skill to follow existing architecture, testing, and workflow conventions."
+policy:
+  allow_implicit_invocation: true
