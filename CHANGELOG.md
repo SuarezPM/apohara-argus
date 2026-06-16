@@ -9,6 +9,58 @@ project adheres to
 
 ## [Unreleased]
 
+### Fixed
+
+- **OpenSSF Scorecard `Vulnerabilities` 0 → 9+**: Patched
+  `sqlx-mysql@0.8.5` to an empty local stub at
+  `crates/empty-sqlx-mysql/` via `[patch.crates-io]`. The stub
+  has all 10 features sqlx enables on `sqlx-mysql` (`any`,
+  `bigdecimal`, `chrono`, `json`, `migrate`, `offline`,
+  `rust_decimal`, `serde`, `time`, `uuid`) defined as empty
+  so cargo's feature resolution succeeds, but the crate body
+  is `#![allow(dead_code, missing_docs)]` with no items.
+  The workspace never enables sqlx's `mysql` feature, so the
+  stub is never compiled — its sole purpose is to keep
+  `rsa@0.9.10` (RUSTSEC-2023-0071, Marvin Attack: timing
+  sidechannel in PKCS#1 v1.5 decryption, unfixed upstream)
+  and its ~30-crate transitive tree (`num-bigint`, `pkcs1`,
+  `pkcs8`, `signature`, `spki`, `sha1`, `sha2`, `hmac`,
+  `md-5`, `getrandom`, `digest`, `crypto-bigint`,
+  `crypto-common`, `elliptic-curve`, etc.) out of
+  `Cargo.lock`. `cargo audit` now reports 0 vulnerabilities.
+  The patch required pinning `sqlx` to `=0.8.5` via
+  `cargo update -p sqlx --precise 0.8.5` because sqlx 0.8.5
+  requires `sqlx-mysql = "=0.8.5"` exactly; sqlx 0.8.6
+  allows the full `^0.8.5` range and cargo would otherwise
+  pick `0.8.6`, which the patch would not match.
+
+- **OpenSSF Scorecard `Branch-Protection` 0 → 8+**: Combined
+  classic branch protection (`enforce_admins: true`,
+  `require_code_owner_reviews: true`,
+  `required_approving_review_count: 1`,
+  `dismiss_stale_reviews: true`,
+  `require_last_push_approval: true`,
+  `required_linear_history: true`,
+  `required_conversation_resolution: true`,
+  `allow_force_pushes: false`, `allow_deletions: false`,
+  `required_status_checks: 7` — the full 7-job CI gate)
+  with a ruleset (ID `17755784`, `main-protection`,
+  `enforcement: active`, targeting `refs/heads/main`)
+  carrying 3 active rules: `deletion`, `non_fast_forward`,
+  `required_linear_history`. The scorecard's
+  `Branch-Protection` check inspects the classic branch
+  protection API (which now returns the maximal-protection
+  JSON above) and the rulesets API (which now sees the
+  3-rule active ruleset). Previous scorecard run had
+  Branch-Protection at 0 because the classic API PATCH
+  endpoint returned 404 (the `repo` PAT scope on a classic
+  token can't update protection managed by a ruleset),
+  and the only solution was `PUT` with the complete body
+  including `required_status_checks` (empty fails with
+  422 "weren't supplied") and `restrictions: null`.
+
+## [0.1.0] - 2026-06-16
+
 ## [0.1.0] - 2026-06-16
 
 Initial release of **ARGUS** — a hybrid (deterministic regex +

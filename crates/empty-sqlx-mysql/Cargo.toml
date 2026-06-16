@@ -1,0 +1,28 @@
+[package]
+name = "sqlx-mysql"
+version = "0.8.5"
+edition = "2021"
+description = "Empty stub for sqlx-mysql; patched out to eliminate rsa@0.9.10 (RUSTSEC-2023-0071)"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[lib]
+path = "src/lib.rs"
+
+# Stub must accept every feature sqlx enables on sqlx-mysql.
+# The real crate's features are: any, bigdecimal, chrono, json,
+# migrate, offline, rust_decimal, serde, time, uuid. All empty
+# here — the stub is never compiled (the workspace never enables
+# sqlx's `mysql` feature), but cargo still needs the features to
+# exist so the patch's version-resolution succeeds.
+[features]
+any = []
+bigdecimal = []
+chrono = []
+json = []
+migrate = []
+offline = []
+rust_decimal = []
+serde = []
+time = []
+uuid = []

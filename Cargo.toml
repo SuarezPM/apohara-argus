@@ -222,6 +222,27 @@ apohara-argus-mcp       = { version = "0.1.0", path = "crates/apohara-argus-mcp"
 argus-benchmarks = { path = "crates/argus-benchmarks" }
 argus-github-app = { path = "crates/argus-github-app" }
 
+# Patches
+# sqlx-mysql is patched out to eliminate rsa@0.9.10 (RUSTSEC-2023-0071,
+# Marvin Attack: timing sidechannel in PKCS#1 v1.5 decryption, unfixed
+# upstream). The workspace never enables sqlx's `mysql` feature, so
+# sqlx-mysql only appears in `Cargo.lock` as an optional transitive
+# dependency — replacing it with an empty stub at
+# `crates/empty-sqlx-mysql/` keeps the entire `rsa` subtree (rsa,
+# pkcs1, pkcs8, signature, spki, sha1, sha2, hmac, md-5, num-bigint,
+# num-integer, num-iter, num-traits, pem, getrandom, digest,
+# crypto-bigint, crypto-common, elliptic-curve, etc., ~30 transitive
+# crates) out of the lock file. The OpenSSF Scorecard `Vulnerabilities`
+# check inspects `Cargo.lock` via `osv-scanner` and reports 0 only
+# when `rsa` is absent.
+# If a future workspace member ever enables sqlx's `mysql` feature,
+# the stub will fail to link with a clear `error[E0432]` directing
+# the maintainer to either (a) wait for an upstream `rsa` fix
+# (none exists as of 0.9.10) or (b) accept and document the
+# vulnerability in `deny.toml` with a written justification.
+[patch.crates-io]
+sqlx-mysql = { path = "crates/empty-sqlx-mysql" }
+
 [profile.release]
 opt-level = 3
 lto = "thin"
