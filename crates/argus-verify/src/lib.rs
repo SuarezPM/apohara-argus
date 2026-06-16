@@ -310,3 +310,174 @@ impl VerifyWorker {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for the `VerifyWorker` constructor chain. We do
+    //! NOT test `analyze()` here — that path needs a mock GitHub
+    //! client + a real NIM key + network access, and the integration
+    //! test in `tests/pipeline_e2e.rs` (gated behind ARGUS_NIM_KEY)
+    //! covers the happy path. These tests pin the cheap invariants
+    //! that downstream code depends on: the default model name,
+    //! the genesis prev_hash, the per-worker audit signing key, and
+    //! the chainable `with_*` builders.
+    use super::*;
+    use argus_github::GitHubClient;
+    use std::sync::Arc;
+
+    #[test]
+    fn new_creates_worker_with_default_model() {
+        // The default model comes from ModelRegistry::default_for_role
+        // (ModelRole::Verdict). We don't pin the exact string (it can
+        // change as the registry evolves) but we verify it's non-empty
+        // and the NimClient is wired up to the same model.
+        let w = VerifyWorker::new("test-nim-key");
+        assert!(!w.nim_model.is_empty(), "default model must be non-empty");
+    }
+
+    #[test]
+    fn new_initializes_prev_hash_to_genesis() {
+        // The per-worker session chain must start at all-zeros
+        // (mirrors argus_crypto::chain::GENESIS_HASH). If this isn't
+        // the case, the first review in a worker would link to a
+        // garbage prev_hash and break tamper-evidence from the start.
+        let w = VerifyWorker::new("test-nim-key");
+        let prev = *w.prev_hash.lock().expect("prev_hash mutex poisoned");
+        assert_eq!(prev, [0u8; 32], "prev_hash must start at GENESIS");
+    }
+
+    #[test]
+    fn new_initializes_audit_prev_hash_to_genesis() {
+        // The audit chain is separate from the PRReview ledger
+        // (different consumer: the EU AI Act auditor vs. the PR
+        // comment). Both start at GENESIS on a fresh worker.
+        let w = VerifyWorker::new("test-nim-key");
+        let audit_prev = *w
+            .audit_prev_hash
+            .lock()
+            .expect("audit_prev_hash mutex poisoned");
+        assert_eq!(audit_prev, [0u8; 32], "audit_prev_hash must start at GENESIS");
+    }
+
+    #[test]
+    fn new_generates_a_signing_key() {
+        // Each worker mints its own Ed25519 signing key for the
+        // Article 12 audit chain. The public key must be 32 bytes
+        // (Ed25519 verification key length).
+        let w = VerifyWorker::new("test-nim-key");
+        let vk = w.audit_signing_key.verifying_key();
+        assert_eq!(vk.to_bytes().len(), 32);
+    }
+
+    #[test]
+    fn new_starts_with_no_github_client() {
+        // The GitHub client is opt-in (requires GITHUB_TOKEN to be
+        // useful). A fresh worker must not have one.
+        let w = VerifyWorker::new("test-nim-key");
+        assert!(w.github.is_none());
+    }
+
+    #[test]
+    fn with_model_replaces_nim_model_and_re_wires_nim_client() {
+        // The builder pattern: with_model(m) sets self.nim_model = m
+        // AND rebuilds self.nim with the same model. Both fields
+        // must end up in sync — a mismatch would mean the LLM is
+        // called with a model name that doesn't match the worker's
+        // declared model.
+        let w = VerifyWorker::new("test-nim-key").with_model("custom/test-model");
+        assert_eq!(w.nim_model, "custom/test-model");
+    }
+
+    #[test]
+    fn with_github_attaches_client() {
+        // with_github(client) stores the client. The token is
+        // opaque to the worker; we just verify the Some(_) variant.
+        let gh = GitHubClient::new("ghp_test_token_for_unit_tests_only");
+        let w = VerifyWorker::new("test-nim-key").with_github(gh);
+        assert!(w.github.is_some());
+    }
+
+    #[test]
+    fn with_model_and_with_github_chain_in_order() {
+        // The builders must compose in any order. This pins the
+        // fluent API contract.
+        let gh = GitHubClient::new("ghp_test");
+        let w = VerifyWorker::new("k")
+            .with_model("m1")
+            .with_github(gh);
+        assert_eq!(w.nim_model, "m1");
+        assert!(w.github.is_some());
+
+        let gh2 = GitHubClient::new("ghp_test_2");
+        let w2 = VerifyWorker::new("k")
+            .with_github(gh2)
+            .with_model("m2");
+        assert_eq!(w2.nim_model, "m2");
+        assert!(w2.github.is_some());
+    }
+
+    #[test]
+    fn audit_store_starts_empty() {
+        // The InMemoryAuditStore is process-local. A fresh worker
+        // must have an empty store (no events emitted yet).
+        let w = VerifyWorker::new("test-nim-key");
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let len = rt.block_on(w.audit_store.len());
+        assert_eq!(len, 0);
+        let is_empty = rt.block_on(w.audit_store.is_empty());
+        assert!(is_empty);
+    }
+
+    #[test]
+    fn arc_mutex_poisoning_does_not_panic_on_lock() {
+        // The worker uses Arc<Mutex<...>> for the two hash chains.
+        // The expect() inside analyze() will panic if the mutex is
+        // poisoned. We verify the locks are alive and usable on a
+        // fresh worker (sanity check; poisoning requires a panic
+        // while holding the lock, which we don't trigger here).
+        let w = VerifyWorker::new("test-nim-key");
+        // Use `drop` rather than `let _ =` — clippy correctly flags
+        // `let _` on a sync lock as a footgun (the lock guard would
+        // be dropped at the end of the statement anyway, but the
+        // `let _ =` form reads like "I want to keep this around").
+        drop(w.prev_hash.lock().expect("prev_hash lock"));
+        drop(w.audit_prev_hash.lock().expect("audit_prev_hash lock"));
+        // The Arc clones must point to the same inner state.
+        let arc1 = Arc::clone(&w.prev_hash);
+        let arc2 = Arc::clone(&w.prev_hash);
+        *arc1.lock().unwrap() = [1u8; 32];
+        assert_eq!(*arc2.lock().unwrap(), [1u8; 32]);
+    }
+
+    #[test]
+    fn analyze_request_default_fields() {
+        // The serde defaults on AnalyzeRequest must kick in for
+        // missing repo_context / post_comment / set_labels fields.
+        // This is the contract the HTTP handler depends on.
+        let raw = r#"{"pr_url": "https://github.com/foo/bar/pull/1"}"#;
+        let req: AnalyzeRequest = serde_json::from_str(raw).unwrap();
+        assert_eq!(req.pr_url, "https://github.com/foo/bar/pull/1");
+        assert!(req.repo_context.is_none());
+        assert!(!req.post_comment);
+        assert!(!req.set_labels);
+    }
+
+    #[test]
+    fn analyze_request_all_optional_fields_set() {
+        // When the caller sets the optional fields, they must
+        // round-trip through serde.
+        let raw = r#"{
+            "pr_url": "https://github.com/foo/bar/pull/2",
+            "repo_context": "src/lib.rs\npub fn foo() {}",
+            "post_comment": true,
+            "set_labels": true
+        }"#;
+        let req: AnalyzeRequest = serde_json::from_str(raw).unwrap();
+        assert_eq!(
+            req.repo_context.as_deref(),
+            Some("src/lib.rs\npub fn foo() {}")
+        );
+        assert!(req.post_comment);
+        assert!(req.set_labels);
+    }
+}

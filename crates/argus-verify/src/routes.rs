@@ -323,4 +323,288 @@ mod tests {
         assert!(msg.target_skill.is_none());
         assert_eq!(msg.parts.len(), 0);
     }
+
+    // =====================================================================
+    // Handler-level integration tests (cover the 4 public axum handlers
+    // that the existing unit tests above don't exercise).
+    // =====================================================================
+
+    use crate::audit_store::InMemoryAuditStore;
+    use apohara_argus_core::{AuditEvent, DataClass, DecisionArtifact};
+    use chrono::{TimeZone, Utc};
+    use uuid::Uuid;
+
+    /// Build a minimal AuditEvent for export tests. The signatures
+    /// are not verified by the export handler (only by the EU AI Act
+    /// auditor downstream), so a deterministic all-zeros signature
+    /// is fine.
+    fn evt(ts: DateTime<Utc>) -> AuditEvent {
+        AuditEvent {
+            audit_id: Uuid::new_v4(),
+            timestamp: ts,
+            model_id: "test".into(),
+            prompt_template_version: "v1".into(),
+            prompt_fingerprint: [0u8; 32],
+            response_fingerprint: [0u8; 32],
+            temperature: 0.7,
+            tool_calls: vec![],
+            input_tokens: 1,
+            output_tokens: 1,
+            estimated_cost_usd: 0.0,
+            data_class: DataClass::SourceCode,
+            policy_version: "test".into(),
+            decision: DecisionArtifact {
+                verdict: "ok".into(),
+                findings_count: 0,
+                rationale: "test".into(),
+            },
+            prev_hash: [0u8; 32],
+            signature: ed25519_dalek::Signature::from_bytes(&[0u8; 64]),
+        }
+    }
+
+    fn ts(year: i32, month: u32, day: u32) -> DateTime<Utc> {
+        Utc.with_ymd_and_hms(year, month, day, 12, 0, 0).unwrap()
+    }
+
+    #[tokio::test]
+    async fn audit_export_handler_empty_store_returns_manifest_only() {
+        // No events in the store → body is just the `# manifest:` footer
+        // (no NDJSON lines before it). Status is 200, content-type is
+        // application/x-ndjson.
+        let store = InMemoryAuditStore::new();
+        let response = audit_export_handler(
+            State(store),
+            Query(ExportQuery {
+                from: None,
+                to: None,
+            }),
+        )
+        .await
+        .into_response();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get("content-type").unwrap(),
+            "application/x-ndjson"
+        );
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let s = String::from_utf8(body.to_vec()).unwrap();
+        // No events → no NDJSON lines, just the manifest footer.
+        assert!(
+            !s.contains("\n{"),
+            "expected no NDJSON event lines, got: {s}"
+        );
+        assert!(s.contains("# manifest:"));
+        assert!(s.contains("\"count\":0"));
+    }
+
+    #[tokio::test]
+    async fn audit_export_handler_with_events_emits_ndjson_plus_manifest() {
+        // Three events in the store → body has 3 NDJSON lines followed
+        // by the manifest footer. The manifest must report count=3 and
+        // a non-empty b3_hash.
+        let store = InMemoryAuditStore::new();
+        store.append(evt(ts(2026, 6, 12))).await;
+        store.append(evt(ts(2026, 6, 13))).await;
+        store.append(evt(ts(2026, 6, 14))).await;
+
+        let response = audit_export_handler(
+            State(store),
+            Query(ExportQuery {
+                from: Some(ts(2026, 1, 1)),
+                to: Some(ts(2027, 1, 1)),
+            }),
+        )
+        .await
+        .into_response();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let s = String::from_utf8(body.to_vec()).unwrap();
+        // 3 NDJSON lines + 1 manifest line + trailing newline.
+        let ndjson_lines: Vec<&str> = s
+            .lines()
+            .filter(|l| !l.starts_with("# manifest:") && !l.is_empty())
+            .collect();
+        assert_eq!(ndjson_lines.len(), 3);
+        // Each line is a valid JSON object.
+        for line in &ndjson_lines {
+            let _: serde_json::Value = serde_json::from_str(line).unwrap();
+        }
+        assert!(s.contains("\"count\":3"));
+        // Non-empty BLAKE3 hash (64 hex chars).
+        assert!(s.contains("\"b3_hash\":\""));
+    }
+
+    #[tokio::test]
+    async fn audit_export_handler_respects_from_to_range() {
+        // An event outside the [from, to] range must be excluded from
+        // both the NDJSON body and the manifest.
+        let store = InMemoryAuditStore::new();
+        store.append(evt(ts(2026, 6, 12))).await; // in range
+        store.append(evt(ts(2025, 1, 1))).await; // out of range (before)
+
+        let response = audit_export_handler(
+            State(store),
+            Query(ExportQuery {
+                from: Some(ts(2026, 1, 1)),
+                to: Some(ts(2027, 1, 1)),
+            }),
+        )
+        .await
+        .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let s = String::from_utf8(body.to_vec()).unwrap();
+        assert!(s.contains("\"count\":1"));
+    }
+
+    #[tokio::test]
+    async fn audit_export_handler_defaults_to_year_window() {
+        // When `from` and `to` are both None, the handler defaults to
+        // (now - 365d, now). An event from 2 years ago must be excluded.
+        let store = InMemoryAuditStore::new();
+        store.append(evt(ts(2024, 1, 1))).await; // too old
+        store.append(evt(ts(2026, 6, 14))).await; // recent
+        let response = audit_export_handler(
+            State(store),
+            Query(ExportQuery {
+                from: None,
+                to: None,
+            }),
+        )
+        .await
+        .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let s = String::from_utf8(body.to_vec()).unwrap();
+        assert!(s.contains("\"count\":1"));
+    }
+
+    #[tokio::test]
+    async fn agent_card_handler_uses_host_header_when_present() {
+        // When the request supplies a Host header, the card's URL must
+        // be templated from it. x-forwarded-proto upgrades to https.
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert("host", "argus.example.com".parse().unwrap());
+        headers.insert("x-forwarded-proto", "https".parse().unwrap());
+        let response = agent_card_handler(headers).await.into_response();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let card: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(
+            card["url"],
+            "https://argus.example.com/.well-known/agent-card.json"
+        );
+        assert_eq!(card["protocol_version"], "0.3");
+    }
+
+    #[tokio::test]
+    async fn agent_card_handler_falls_back_to_defaults_when_headers_missing() {
+        // An empty HeaderMap → host defaults to "argus.local" and
+        // scheme defaults to "http". The card must still be well-formed.
+        let headers = axum::http::HeaderMap::new();
+        let response = agent_card_handler(headers).await.into_response();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let card: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(
+            card["url"],
+            "http://argus.local/.well-known/agent-card.json"
+        );
+        // Skills are still listed (sanity check).
+        assert!(card["skills"].as_array().unwrap().len() == 5);
+    }
+
+    #[tokio::test]
+    async fn a2a_message_handler_acks_with_target_skill() {
+        // When target_skill is set, the response echoes it back and
+        // includes the text excerpt from parts[0].
+        let msg = A2AMessage {
+            role: "user".to_string(),
+            parts: vec![A2APart {
+                kind: "text".to_string(),
+                text: Some("please review the security implications of this PR".to_string()),
+            }],
+            target_skill: Some("security".to_string()),
+        };
+        let response = a2a_message_handler(Json(msg)).await.into_response();
+        assert_eq!(response.status(), StatusCode::ACCEPTED);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(v["status"], "received");
+        assert_eq!(v["target_skill"], "security");
+        assert!(v["echo_text_excerpt"]
+            .as_str()
+            .unwrap()
+            .contains("security"));
+    }
+
+    #[tokio::test]
+    async fn a2a_message_handler_defaults_target_skill() {
+        // Missing target_skill → the handler substitutes "default"
+        // (per the A2A minimal-subset behavior; the real work goes
+        // through /analyze).
+        let msg = A2AMessage {
+            role: "agent".to_string(),
+            parts: vec![],
+            target_skill: None,
+        };
+        let response = a2a_message_handler(Json(msg)).await.into_response();
+        assert_eq!(response.status(), StatusCode::ACCEPTED);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(v["target_skill"], "default");
+    }
+
+    #[tokio::test]
+    async fn a2a_message_handler_truncates_text_at_120_chars() {
+        // The echo_text_excerpt field is bounded to 120 chars to keep
+        // the response small. Longer messages must be truncated, not
+        // stored in full.
+        let long_text: String = "x".repeat(500);
+        let msg = A2AMessage {
+            role: "user".to_string(),
+            parts: vec![A2APart {
+                kind: "text".to_string(),
+                text: Some(long_text.clone()),
+            }],
+            target_skill: Some("lens".to_string()),
+        };
+        let response = a2a_message_handler(Json(msg)).await.into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let excerpt = v["echo_text_excerpt"].as_str().unwrap();
+        assert_eq!(excerpt.chars().count(), 120);
+    }
+
+    #[tokio::test]
+    async fn a2a_disabled_handler_returns_404_with_hint() {
+        // When the A2A surface is disabled (ARGUS_A2A_DISABLED=true),
+        // the merged router falls back to this handler. It must
+        // return 404 with a JSON body that includes the env-var hint.
+        let response = a2a_disabled_handler().await.into_response();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(v["error"], "A2A surface disabled");
+        assert!(v["hint"].as_str().unwrap().contains("ARGUS_A2A_DISABLED"));
+    }
 }
