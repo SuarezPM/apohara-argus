@@ -31,8 +31,6 @@ pub mod test_util;
 
 pub use model_registry::{ModelRegistry, ModelRole};
 
-
-
 pub use circuit_breaker::{CircuitBreakerConfig, CircuitError, CircuitState, LlmCircuitBreaker};
 pub use mock::MockClient;
 pub use nim::NimClient;
