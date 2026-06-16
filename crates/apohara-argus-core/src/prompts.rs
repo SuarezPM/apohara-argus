@@ -164,4 +164,135 @@ mod tests {
         assert_eq!(p.metadata.max_tokens, 100);
         assert!(p.body.contains("This is the body."));
     }
+
+    #[test]
+    fn parse_prompt_without_frontmatter_errors() {
+        // A .md file that doesn't start with `---` has no YAML
+        // frontmatter and must be rejected with PromptNotFound.
+        let md = "This is just body text without frontmatter.\n";
+        let res = parse_prompt("no-frontmatter", md);
+        assert!(res.is_err());
+        match res {
+            Err(ArgusError::PromptNotFound(msg)) => {
+                assert!(msg.contains("no YAML frontmatter"));
+            }
+            other => panic!("expected PromptNotFound, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_prompt_with_unterminated_frontmatter_errors() {
+        // A .md file that starts with `---` but never closes the
+        // frontmatter block must be rejected.
+        let md = "---\nname: foo\nmodel: bar\nThis body never gets separated from the YAML.\n";
+        let res = parse_prompt("unterminated", md);
+        assert!(res.is_err());
+        match res {
+            Err(ArgusError::PromptNotFound(msg)) => {
+                assert!(msg.contains("unterminated frontmatter"));
+            }
+            other => panic!("expected PromptNotFound, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_prompt_with_invalid_yaml_errors() {
+        // A .md file with a closed frontmatter block but malformed
+        // YAML must be rejected with the YAML error message.
+        let md = "---\nname: foo\nmodel: [unclosed bracket\n---\n\nBody.\n";
+        let res = parse_prompt("bad-yaml", md);
+        assert!(res.is_err());
+        match res {
+            Err(ArgusError::PromptNotFound(msg)) => {
+                assert!(msg.contains("Invalid YAML"));
+            }
+            other => panic!("expected PromptNotFound, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_prompt_strips_bom() {
+        // The UTF-8 BOM (U+FEFF) is common in Windows-edited files.
+        // The parser must strip it before checking for the frontmatter
+        // delimiter.
+        let md = "\u{feff}---\nname: foo\nmodel: bar\ntemperature: 0.5\nmax_tokens: 100\ndescription: desc\noutput_format: json\n---\n\nBody after BOM.\n";
+        let p = parse_prompt("with-bom", md).expect("BOM should be stripped");
+        assert_eq!(p.metadata.name, "foo");
+    }
+
+    #[test]
+    fn list_returns_sorted_names() {
+        let lib = PromptLibrary::load_embedded().expect("should load");
+        let names = lib.list();
+        assert_eq!(names.len(), 4);
+        // Must be sorted alphabetically.
+        let mut sorted = names.clone();
+        sorted.sort();
+        assert_eq!(names, sorted);
+    }
+
+    #[test]
+    fn is_empty_on_empty_library() {
+        let lib = PromptLibrary::default();
+        assert!(lib.is_empty());
+        assert_eq!(lib.len(), 0);
+        assert!(lib.list().is_empty());
+        assert!(lib.get("anything").is_none());
+    }
+
+    #[test]
+    fn is_empty_on_loaded_library() {
+        let lib = PromptLibrary::load_embedded().expect("should load");
+        assert!(!lib.is_empty());
+    }
+
+    #[test]
+    fn load_from_dir_skips_non_md_files() {
+        // The directory loader must only pick up .md files. Other
+        // extensions (e.g., .txt, .yaml) in the directory are
+        // silently skipped — they don't error and they don't load.
+        let dir = std::env::temp_dir().join("argus-prompts-test-skips");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // Write one valid .md and one .txt that must be skipped.
+        std::fs::write(
+            dir.join("good.md"),
+            "---\nname: good\nmodel: m\ntemperature: 0.5\nmax_tokens: 100\ndescription: d\noutput_format: json\n---\n\nbody\n",
+        )
+        .unwrap();
+        std::fs::write(dir.join("ignored.txt"), "not a prompt").unwrap();
+        let lib = PromptLibrary::load_from_dir(&dir).expect("should load");
+        assert_eq!(lib.len(), 1);
+        assert!(lib.get("good").is_some());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn load_from_dir_errors_on_missing_directory() {
+        let dir = std::env::temp_dir().join("argus-prompts-test-nonexistent-xyz");
+        let _ = std::fs::remove_dir_all(&dir);
+        let res = PromptLibrary::load_from_dir(&dir);
+        assert!(res.is_err());
+        match res {
+            Err(ArgusError::Internal(msg)) => {
+                assert!(msg.contains("read_dir failed"));
+            }
+            other => panic!("expected ArgusError::Internal, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn load_from_dir_errors_on_invalid_prompt_file() {
+        // If a .md file in the directory is malformed (no
+        // frontmatter), the loader must propagate the error from
+        // parse_prompt. The error stops the load — partial loads
+        // are not returned.
+        let dir = std::env::temp_dir().join("argus-prompts-test-invalid");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("bad.md"), "no frontmatter here\n").unwrap();
+        let res = PromptLibrary::load_from_dir(&dir);
+        assert!(res.is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
