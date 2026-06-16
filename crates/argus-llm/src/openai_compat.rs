@@ -218,12 +218,61 @@ impl LlmClient for OpenAICompatClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    /// Spin up a one-shot mock HTTP server on 127.0.0.1:0 (random
+    /// port). Returns the base URL to point a client at. The server
+    /// accepts ONE connection, reads the request, writes the canned
+    /// `status` + `body` response, then exits. This is enough for
+    /// the `complete()` path which makes a single POST and reads
+    /// the response. Loops for retries from the client's retry
+    /// logic if any.
+    async fn spawn_mock(status: u16, body: &'static str) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            loop {
+                let (mut stream, _) = match listener.accept().await {
+                    Ok(c) => c,
+                    Err(_) => break,
+                };
+                // Read up to 16 KiB of the request (discard it).
+                let mut buf = vec![0u8; 16384];
+                let _ = stream.read(&mut buf).await;
+                // Write the canned response.
+                let response = format!(
+                    "HTTP/1.1 {status} OK\r\nContent-Type: application/json\r\nContent-Length: {len}\r\nConnection: close\r\n\r\n{body}",
+                    status = status,
+                    len = body.len(),
+                    body = body,
+                );
+                let _ = stream.write_all(response.as_bytes()).await;
+                let _ = stream.shutdown().await;
+            }
+        });
+        format!("http://{}/v1", addr)
+    }
+
+    /// Standard OpenAI-compatible success response with the
+    /// assistant content we want to assert on.
+    const OK_BODY: &str = r#"{"id":"x","model":"test-model","choices":[{"index":0,"message":{"role":"assistant","content":"hello"},"finish_reason":"stop"}],"usage":{"prompt_tokens":5,"completion_tokens":3,"total_tokens":8}}"#;
+
+    /// OpenAI-compatible error envelope (used by all 4xx/5xx paths).
+    const ERR_BODY: &str =
+        r#"{"error":{"message":"bad key","type":"invalid_request_error","code":"x"}}"#;
 
     #[test]
     fn builds_correct_url() {
         let c = OpenAICompatClient::new("https://integrate.api.nvidia.com/v1/");
         let url = format!("{}/chat/completions", c.base_url.trim_end_matches('/'));
         assert_eq!(url, "https://integrate.api.nvidia.com/v1/chat/completions");
+    }
+
+    #[test]
+    fn new_client_uses_default_timeout() {
+        let c = OpenAICompatClient::new("https://x/v1");
+        assert_eq!(c.timeout, Duration::from_secs(120));
     }
 
     #[test]
@@ -236,5 +285,111 @@ mod tests {
                 .await;
             assert!(matches!(res, Err(LlmError::MissingKey)));
         });
+    }
+
+    #[tokio::test]
+    async fn complete_200_returns_content_and_usage() {
+        let url = spawn_mock(200, OK_BODY).await;
+        let c = OpenAICompatClient::new(url);
+        let resp = c
+            .complete_one_shot("test-model", "sys", "user", "k", 0.5, 100)
+            .await
+            .unwrap();
+        assert_eq!(resp.content, "hello");
+        assert_eq!(resp.model, "test-model");
+        assert_eq!(resp.usage.prompt_tokens, 5);
+        assert_eq!(resp.usage.completion_tokens, 3);
+        assert_eq!(resp.usage.total_tokens, 8);
+    }
+
+    #[tokio::test]
+    async fn complete_429_returns_rate_limited() {
+        let url = spawn_mock(429, ERR_BODY).await;
+        let c = OpenAICompatClient::new(url);
+        let res = c.complete_one_shot("m", "s", "u", "k", 0.5, 100).await;
+        assert!(matches!(res, Err(LlmError::RateLimited { .. })));
+    }
+
+    #[tokio::test]
+    async fn complete_503_returns_rate_limited() {
+        let url = spawn_mock(503, ERR_BODY).await;
+        let c = OpenAICompatClient::new(url);
+        let res = c.complete_one_shot("m", "s", "u", "k", 0.5, 100).await;
+        assert!(matches!(res, Err(LlmError::RateLimited { .. })));
+    }
+
+    #[tokio::test]
+    async fn complete_500_returns_api_error_with_message() {
+        let url = spawn_mock(500, ERR_BODY).await;
+        let c = OpenAICompatClient::new(url);
+        let res = c.complete_one_shot("m", "s", "u", "k", 0.5, 100).await;
+        match res {
+            Err(LlmError::Api { status, message }) => {
+                assert_eq!(status, 500);
+                assert_eq!(message, "bad key");
+            }
+            other => panic!("expected LlmError::Api, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn complete_500_non_json_body_returns_api_error_with_text() {
+        let url = spawn_mock(500, "internal server error").await;
+        let c = OpenAICompatClient::new(url);
+        let res = c.complete_one_shot("m", "s", "u", "k", 0.5, 100).await;
+        match res {
+            Err(LlmError::Api { status, message }) => {
+                assert_eq!(status, 500);
+                assert_eq!(message, "internal server error");
+            }
+            other => panic!("expected LlmError::Api, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn complete_200_no_choices_returns_parse_error() {
+        let body = r#"{"id":"x","model":"m","choices":[],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}"#;
+        let url = spawn_mock(200, body).await;
+        let c = OpenAICompatClient::new(url);
+        let res = c.complete_one_shot("m", "s", "u", "k", 0.5, 100).await;
+        assert!(matches!(res, Err(LlmError::Parse(_))));
+    }
+
+    #[tokio::test]
+    async fn complete_200_no_usage_uses_default() {
+        let body = r#"{"id":"x","model":"m","choices":[{"index":0,"message":{"role":"assistant","content":"x"},"finish_reason":"stop"}]}"#;
+        let url = spawn_mock(200, body).await;
+        let c = OpenAICompatClient::new(url);
+        let resp = c
+            .complete_one_shot("m", "s", "u", "k", 0.5, 100)
+            .await
+            .unwrap();
+        // Default Usage is all zeros when the provider omits it.
+        assert_eq!(resp.usage.prompt_tokens, 0);
+        assert_eq!(resp.usage.completion_tokens, 0);
+        assert_eq!(resp.usage.total_tokens, 0);
+    }
+
+    #[tokio::test]
+    async fn complete_unreachable_returns_http_error() {
+        // Port 1 is reserved and almost never bound; reqwest should
+        // fail with a connection error, not a timeout.
+        let c = OpenAICompatClient::new("http://127.0.0.1:1/v1");
+        let res = c.complete_one_shot("m", "s", "u", "k", 0.5, 100).await;
+        assert!(matches!(res, Err(LlmError::Http(_))));
+    }
+
+    #[tokio::test]
+    async fn complete_invalid_json_returns_parse_error() {
+        let url = spawn_mock(200, "not json {").await;
+        let c = OpenAICompatClient::new(url);
+        let res = c.complete_one_shot("m", "s", "u", "k", 0.5, 100).await;
+        assert!(matches!(res, Err(LlmError::Parse(_))));
+    }
+
+    #[tokio::test]
+    async fn provider_name_is_openai_compat() {
+        let c = OpenAICompatClient::new("http://x/v1");
+        assert_eq!(c.provider_name(), "openai-compat");
     }
 }

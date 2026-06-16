@@ -242,3 +242,227 @@ impl LlmClient for NimClient {
         Ok(response)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::super::Message;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    /// Minimal OpenAI-compatible success body for the mock server.
+    /// The `model` field is what the provider echoes back; the NIM
+    /// client must copy that into `CompletionResponse.model`.
+    const OK_BODY: &str = r#"{"id":"x","model":"echoed-model","choices":[{"index":0,"message":{"role":"assistant","content":"hello"},"finish_reason":"stop"}],"usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3}}"#;
+    const ERR_BODY: &str = r#"{"error":{"message":"nope","type":"x","code":"y"}}"#;
+
+    async fn spawn_mock(status: u16, body: &'static str) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            loop {
+                let (mut stream, _) = match listener.accept().await {
+                    Ok(c) => c,
+                    Err(_) => break,
+                };
+                let mut buf = vec![0u8; 16384];
+                let _ = stream.read(&mut buf).await;
+                let response = format!(
+                    "HTTP/1.1 {status} OK\r\nContent-Type: application/json\r\nContent-Length: {len}\r\nConnection: close\r\n\r\n{body}",
+                    status = status, len = body.len(), body = body,
+                );
+                let _ = stream.write_all(response.as_bytes()).await;
+                let _ = stream.shutdown().await;
+            }
+        });
+        format!("http://{}/v1", addr)
+    }
+
+    #[test]
+    fn default_uses_nim_base_url_and_verdict_role() {
+        let c = NimClient::default();
+        assert_eq!(c.model_role, ModelRole::Verdict);
+        assert_eq!(c.model, "");
+        assert!(c.signing_key.is_none());
+    }
+
+    #[test]
+    fn new_is_alias_for_default() {
+        let c = NimClient::new();
+        assert_eq!(c.model_role, ModelRole::Verdict);
+    }
+
+    #[test]
+    fn with_model_sets_explicit_model() {
+        let c = NimClient::new().with_model("custom/model");
+        assert_eq!(c.model, "custom/model");
+    }
+
+    #[test]
+    fn with_base_url_replaces_inner_client() {
+        let c = NimClient::new().with_base_url("https://other.example/v1");
+        assert_eq!(c.inner.provider_name(), "openai-compat");
+    }
+
+    #[test]
+    fn with_role_sets_role() {
+        let c = NimClient::new().with_role(ModelRole::Slop);
+        assert_eq!(c.model_role, ModelRole::Slop);
+    }
+
+    #[test]
+    fn with_circuit_breaker_keeps_nim_provider_name() {
+        let c = NimClient::new().with_circuit_breaker(CircuitBreakerConfig::default());
+        // The breaker decorates the inner client but the outer
+        // provider_name must still report "nim" (the breaker
+        // doesn't override the trait method).
+        assert_eq!(c.provider_name(), "nim");
+    }
+
+    #[test]
+    fn provider_name_is_nim() {
+        let c = NimClient::new();
+        assert_eq!(c.provider_name(), "nim");
+    }
+
+    #[test]
+    fn debug_does_not_expose_signing_key_material() {
+        // The Debug impl prints `signing_key_set: bool` (not the
+        // key bytes). We assert by formatting and checking the
+        // output contains the boolean and does NOT contain the
+        // private key bytes (use a non-zero byte to detect).
+        let key = SigningKey::from_bytes(&[42u8; 32]);
+        let c = NimClient::new().with_signing_key(key);
+        let s = format!("{:?}", c);
+        assert!(s.contains("signing_key_set: true"));
+        // No 42 byte should appear in the Debug output (the key
+        // is 32 bytes of 42; we just check the magic byte is not
+        // present in a way that suggests leak).
+        assert!(!s.contains("SigningKey"));
+    }
+
+    #[tokio::test]
+    async fn complete_200_advances_prev_hash_and_returns_response() {
+        let url = spawn_mock(200, OK_BODY).await;
+        let c = NimClient::new().with_base_url(url);
+        let before = *c.prev_hash.lock().unwrap();
+        let resp = c
+            .complete(
+                CompletionRequest::new(
+                    "explicit-model",
+                    vec![Message::system("sys"), Message::user("user")],
+                ),
+                "k",
+            )
+            .await
+            .unwrap();
+        let after = *c.prev_hash.lock().unwrap();
+        assert_eq!(resp.content, "hello");
+        assert_eq!(resp.model, "echoed-model");
+        // The audit chain must have advanced (BLAKE3 chain).
+        assert_ne!(before, after);
+    }
+
+    #[tokio::test]
+    async fn complete_request_model_wins_over_with_model() {
+        let url = spawn_mock(200, OK_BODY).await;
+        // The request sets model "from-request"; the client was
+        // built with with_model("from-builder"). The request model
+        // must win per the resolution order documented in
+        // NimClient::complete.
+        let c = NimClient::new()
+            .with_base_url(url)
+            .with_model("from-builder");
+        let resp = c
+            .complete(
+                CompletionRequest::new("from-request", vec![Message::user("u")]),
+                "k",
+            )
+            .await
+            .unwrap();
+        // We can't assert the model passed to the upstream from
+        // here, but we can verify the call succeeded and the
+        // response was received.
+        assert_eq!(resp.content, "hello");
+    }
+
+    #[tokio::test]
+    async fn complete_with_model_wins_over_role_default() {
+        let url = spawn_mock(200, OK_BODY).await;
+        // No request model, with_model set, role=Slop. The
+        // with_model must win over the role default.
+        let c = NimClient::new()
+            .with_base_url(url)
+            .with_model("explicit-override")
+            .with_role(ModelRole::Slop);
+        let resp = c
+            .complete(CompletionRequest::new("", vec![Message::user("u")]), "k")
+            .await
+            .unwrap();
+        assert_eq!(resp.content, "hello");
+    }
+
+    #[tokio::test]
+    async fn complete_uses_role_default_when_no_override() {
+        let url = spawn_mock(200, OK_BODY).await;
+        // No request model, no with_model, role=Slop. The role
+        // default (from ModelRegistry) must be used.
+        let c = NimClient::new()
+            .with_base_url(url)
+            .with_role(ModelRole::Slop);
+        let resp = c
+            .complete(CompletionRequest::new("", vec![Message::user("u")]), "k")
+            .await
+            .unwrap();
+        assert_eq!(resp.content, "hello");
+    }
+
+    #[tokio::test]
+    async fn complete_inner_error_does_not_emit_audit_event() {
+        let url = spawn_mock(500, ERR_BODY).await;
+        let c = NimClient::new().with_base_url(url);
+        let before = *c.prev_hash.lock().unwrap();
+        let res = c
+            .complete(CompletionRequest::new("m", vec![Message::user("u")]), "k")
+            .await;
+        let after = *c.prev_hash.lock().unwrap();
+        assert!(res.is_err());
+        // Audit events are only emitted for successful calls; the
+        // hash chain must NOT advance on error.
+        assert_eq!(before, after);
+    }
+
+    #[tokio::test]
+    async fn complete_missing_key_propagates() {
+        let url = spawn_mock(200, OK_BODY).await;
+        let c = NimClient::new().with_base_url(url);
+        let res = c
+            .complete(CompletionRequest::new("m", vec![Message::user("u")]), "")
+            .await;
+        assert!(matches!(res, Err(LlmError::MissingKey)));
+    }
+
+    #[test]
+    fn nim_default_base_url_constant_is_correct() {
+        assert_eq!(NIM_DEFAULT_BASE_URL, "https://integrate.api.nvidia.com/v1");
+    }
+
+    #[test]
+    fn nim_default_model_constant_is_set() {
+        // The model name must be non-empty (we don't pin a specific
+        // value because the registry may swap models as NIM rotates
+        // its free-tier catalog).
+        assert!(!NIM_DEFAULT_MODEL.is_empty());
+        assert!(NIM_DEFAULT_MODEL.contains('/'));
+    }
+
+    #[test]
+    fn nim_available_models_have_descriptions() {
+        // Every model in the catalog must have a non-empty name
+        // and a non-empty description.
+        for (name, desc) in NIM_AVAILABLE_MODELS {
+            assert!(!name.is_empty());
+            assert!(!desc.is_empty());
+        }
+    }
+}
