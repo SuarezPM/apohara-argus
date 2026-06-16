@@ -103,3 +103,99 @@ pub fn extract_json(raw: &str) -> String {
     let s = s.strip_suffix("```").unwrap_or(s);
     s.trim().to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for the shared slop crate surface: the `extract_json`
+    //! helper (used by all 4 analyzers) + the `SlopError` Display impls.
+    use super::*;
+
+    #[test]
+    fn extract_json_handles_bare_json() {
+        // The simplest case: the LLM returns clean JSON.
+        let raw = r#"{"a":1,"b":"x"}"#;
+        assert_eq!(extract_json(raw), raw);
+    }
+
+    #[test]
+    fn extract_json_strips_json_fence() {
+        // The most common case: ```json ... ```
+        let raw = "```json\n{\"a\":1}\n```";
+        assert_eq!(extract_json(raw), "{\"a\":1}");
+    }
+
+    #[test]
+    fn extract_json_strips_plain_fence() {
+        // Some models emit ``` without the json tag.
+        let raw = "```\n{\"a\":1}\n```";
+        assert_eq!(extract_json(raw), "{\"a\":1}");
+    }
+
+    #[test]
+    fn extract_json_strips_surrounding_whitespace() {
+        // The `trim()` on entry handles leading/trailing whitespace.
+        let raw = "   \n{\"a\":1}\n   ";
+        assert_eq!(extract_json(raw), "{\"a\":1}");
+    }
+
+    #[test]
+    fn extract_json_handles_prose_around_json() {
+        // LLMs sometimes return: "Here is the result: {...} Hope this helps!"
+        // The current implementation only strips fences, not prose.
+        // We document the behavior: prose stays, fence gets stripped.
+        let raw = "Here is the result:\n{\"a\":1}\nDone.";
+        assert_eq!(extract_json(raw), "Here is the result:\n{\"a\":1}\nDone.");
+    }
+
+    #[test]
+    fn extract_json_handles_unicode() {
+        // The analyzer prompts can produce non-ASCII (e.g. Spanish
+        // code comments). The extractor must not corrupt them.
+        let raw = r#"{"msg":"hola — ñoño"}"#;
+        assert_eq!(extract_json(raw), raw);
+    }
+
+    #[test]
+    fn slop_error_llm_display() {
+        // The Display impl is what shows up in the audit chain +
+        // the CLI. The format must be stable for log parsers.
+        let e = SlopError::Llm("rate limited".to_string());
+        assert_eq!(e.to_string(), "LLM error: rate limited");
+    }
+
+    #[test]
+    fn slop_error_parse_display() {
+        let e = SlopError::Parse("unexpected token at line 5".to_string());
+        assert_eq!(e.to_string(), "Parse error: unexpected token at line 5");
+    }
+
+    #[test]
+    fn slop_error_prompt_display() {
+        let e = SlopError::Prompt("prompt 'foo' not found".to_string());
+        assert_eq!(e.to_string(), "Prompt error: prompt 'foo' not found");
+    }
+
+    #[test]
+    fn slop_error_debug_includes_variant() {
+        // The Debug impl is used in test failures and panic
+        // messages; the variant name must be present so we can
+        // distinguish Parse vs Llm vs Prompt in the logs.
+        let llm = format!("{:?}", SlopError::Llm("x".to_string()));
+        let parse = format!("{:?}", SlopError::Parse("x".to_string()));
+        let prompt = format!("{:?}", SlopError::Prompt("x".to_string()));
+        assert!(llm.contains("Llm"));
+        assert!(parse.contains("Parse"));
+        assert!(prompt.contains("Prompt"));
+    }
+
+    #[test]
+    fn re_exports_are_accessible_from_crate_root() {
+        // The 4 analyzers + their reports must be importable as
+        // `argus_slop::Analyzer` etc. (the `pub use` in lib.rs).
+        // We just check the type names resolve.
+        let _: fn() -> ArchitectureFit = ArchitectureFit::new;
+        let _: fn() -> SecurityReview = SecurityReview::new;
+        let _: fn() -> SlopDetector = SlopDetector::new;
+        let _: fn() -> VerdictSynthesizer = VerdictSynthesizer::new;
+    }
+}

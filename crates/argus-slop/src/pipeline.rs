@@ -159,3 +159,268 @@ impl AnalysisPipeline {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for AnalysisPipeline::synthesize. We don't test the
+    //! async `run` (it needs a real LlmClient); we test the
+    //! deterministic decision logic of `synthesize` directly with
+    //! hand-built reports. This pins the heuristics that the LLM
+    //! prompt tells the model to mirror.
+    use super::*;
+    use crate::security::SecuritySeverity;
+    use apohara_argus_core::VerdictStatus;
+
+    fn slop(score: f32) -> SlopReport {
+        SlopReport {
+            slop_score: score,
+            signals_detected: vec!["s1".to_string()],
+            specific_examples: vec![],
+            confidence: 0.9,
+            reasoning: "test".to_string(),
+        }
+    }
+
+    fn arch(fit: f32) -> ArchReport {
+        ArchReport {
+            fit_score: fit,
+            verdict: "ok".to_string(),
+            positives: vec![],
+            concerns: vec![],
+            summary: "ok".to_string(),
+        }
+    }
+
+    fn sec(sev: SecuritySeverity) -> SecurityReport {
+        SecurityReport {
+            highest_severity: sev,
+            findings: vec![],
+            summary: "ok".to_string(),
+        }
+    }
+
+    #[test]
+    fn pipeline_new_builds_default() {
+        // The default constructor must not panic and must wire up
+        // the 4 sub-analyzers with their default configs.
+        let p = AnalysisPipeline::new();
+        // Smoke test: the synthesizer is reachable through synthesize().
+        let v = p.synthesize("pr/0", &None, &None, &None);
+        assert_eq!(v.status, VerdictStatus::ReviewRequired);
+    }
+
+    #[test]
+    fn synthesize_missing_slop_returns_review_required() {
+        let p = AnalysisPipeline::new();
+        let v = p.synthesize(
+            "pr/1",
+            &None,
+            &Some(sec(SecuritySeverity::None)),
+            &Some(arch(0.3)),
+        );
+        assert_eq!(v.status, VerdictStatus::ReviewRequired);
+    }
+
+    #[test]
+    fn synthesize_missing_security_returns_review_required() {
+        let p = AnalysisPipeline::new();
+        let v = p.synthesize("pr/2", &Some(slop(0.3)), &None, &Some(arch(0.3)));
+        assert_eq!(v.status, VerdictStatus::ReviewRequired);
+    }
+
+    #[test]
+    fn synthesize_missing_arch_returns_review_required() {
+        let p = AnalysisPipeline::new();
+        let v = p.synthesize(
+            "pr/3",
+            &Some(slop(0.3)),
+            &Some(sec(SecuritySeverity::None)),
+            &None,
+        );
+        assert_eq!(v.status, VerdictStatus::ReviewRequired);
+    }
+
+    #[test]
+    fn synthesize_critical_security_halts() {
+        // Critical severity always escalates to HALTED, regardless
+        // of the other scores.
+        let p = AnalysisPipeline::new();
+        let v = p.synthesize(
+            "pr/crit",
+            &Some(slop(0.1)),
+            &Some(sec(SecuritySeverity::Critical)),
+            &Some(arch(0.1)),
+        );
+        assert_eq!(v.status, VerdictStatus::Halted);
+    }
+
+    #[test]
+    fn synthesize_high_security_halts() {
+        let p = AnalysisPipeline::new();
+        let v = p.synthesize(
+            "pr/high",
+            &Some(slop(0.1)),
+            &Some(sec(SecuritySeverity::High)),
+            &Some(arch(0.1)),
+        );
+        assert_eq!(v.status, VerdictStatus::Halted);
+    }
+
+    #[test]
+    fn synthesize_high_slop_plus_arch_halts() {
+        // slop > 0.7 AND arch > 0.5 → HALTED.
+        let p = AnalysisPipeline::new();
+        let v = p.synthesize(
+            "pr/sa",
+            &Some(slop(0.8)),
+            &Some(sec(SecuritySeverity::None)),
+            &Some(arch(0.6)),
+        );
+        assert_eq!(v.status, VerdictStatus::Halted);
+    }
+
+    #[test]
+    fn synthesize_very_high_slop_alone_halts() {
+        // slop > 0.85 alone → HALTED.
+        let p = AnalysisPipeline::new();
+        let v = p.synthesize(
+            "pr/vs",
+            &Some(slop(0.9)),
+            &Some(sec(SecuritySeverity::None)),
+            &Some(arch(0.3)),
+        );
+        assert_eq!(v.status, VerdictStatus::Halted);
+    }
+
+    #[test]
+    fn synthesize_very_high_arch_alone_halts() {
+        // arch > 0.7 alone → HALTED.
+        let p = AnalysisPipeline::new();
+        let v = p.synthesize(
+            "pr/va",
+            &Some(slop(0.3)),
+            &Some(sec(SecuritySeverity::None)),
+            &Some(arch(0.8)),
+        );
+        assert_eq!(v.status, VerdictStatus::Halted);
+    }
+
+    #[test]
+    fn synthesize_moderate_slop_review_required() {
+        // 0.5 < slop <= 0.7 (with arch low) → REVIEW_REQUIRED.
+        let p = AnalysisPipeline::new();
+        let v = p.synthesize(
+            "pr/ms",
+            &Some(slop(0.6)),
+            &Some(sec(SecuritySeverity::None)),
+            &Some(arch(0.3)),
+        );
+        assert_eq!(v.status, VerdictStatus::ReviewRequired);
+    }
+
+    #[test]
+    fn synthesize_moderate_arch_review_required() {
+        // 0.5 < arch <= 0.7 (with slop low) → REVIEW_REQUIRED.
+        let p = AnalysisPipeline::new();
+        let v = p.synthesize(
+            "pr/ma",
+            &Some(slop(0.3)),
+            &Some(sec(SecuritySeverity::None)),
+            &Some(arch(0.6)),
+        );
+        assert_eq!(v.status, VerdictStatus::ReviewRequired);
+    }
+
+    #[test]
+    fn synthesize_clean_approved() {
+        // All scores low, no security findings → APPROVED.
+        let p = AnalysisPipeline::new();
+        let v = p.synthesize(
+            "pr/clean",
+            &Some(slop(0.2)),
+            &Some(sec(SecuritySeverity::None)),
+            &Some(arch(0.3)),
+        );
+        assert_eq!(v.status, VerdictStatus::Approved);
+    }
+
+    #[test]
+    fn risk_score_clamped_to_unit_interval() {
+        // The risk aggregation in pipeline.rs is:
+        //   (slop * 0.4 + arch * 0.4 + (n_findings * 0.05).min(0.2))
+        //     .clamp(0.0, 1.0)
+        // We build a case that would overflow 1.0 without the clamp
+        // (slop=1.0, arch=1.0, 100 findings) and verify it stays <= 1.0.
+        let p = AnalysisPipeline::new();
+        let mut s = sec(SecuritySeverity::None);
+        for i in 0..100 {
+            s.findings.push(crate::security::SecurityFinding {
+                severity: SecuritySeverity::Low,
+                file: format!("f{i}.rs"),
+                line: Some(i as u32),
+                category: "x".to_string(),
+                quote: "q".to_string(),
+                description: "d".to_string(),
+                recommendation: "r".to_string(),
+            });
+        }
+        let v = p.synthesize("pr/overflow", &Some(slop(1.0)), &Some(s), &Some(arch(1.0)));
+        let risk: f32 = v.risk_score.as_f32();
+        assert!(risk <= 1.0, "risk={risk}");
+        assert!(risk > 0.0);
+    }
+
+    #[test]
+    fn key_findings_and_action_items_populated() {
+        // The synthesizer always populates key_findings (3 entries)
+        // and action_items (up to 3 from security findings).
+        let p = AnalysisPipeline::new();
+        let v = p.synthesize(
+            "pr/kf",
+            &Some(slop(0.3)),
+            &Some(sec(SecuritySeverity::None)),
+            &Some(arch(0.3)),
+        );
+        assert_eq!(v.key_findings.len(), 3);
+        // action_items comes from sec.findings (none here).
+        assert!(v.action_items.is_empty());
+    }
+
+    #[test]
+    fn action_items_take_top_3_recommendations() {
+        let p = AnalysisPipeline::new();
+        let mut s = sec(SecuritySeverity::Medium);
+        for i in 0..5 {
+            s.findings.push(crate::security::SecurityFinding {
+                severity: SecuritySeverity::Medium,
+                file: format!("f{i}.rs"),
+                line: Some(i as u32),
+                category: "x".to_string(),
+                quote: "q".to_string(),
+                description: "d".to_string(),
+                recommendation: format!("fix-{i}"),
+            });
+        }
+        let v = p.synthesize("pr/ai", &Some(slop(0.3)), &Some(s), &Some(arch(0.3)));
+        assert_eq!(v.action_items.len(), 3);
+        assert_eq!(v.action_items[0], "fix-0");
+        assert_eq!(v.action_items[1], "fix-1");
+        assert_eq!(v.action_items[2], "fix-2");
+    }
+
+    #[test]
+    fn reasoning_string_includes_all_three_scores() {
+        // The reasoning field is shown in the audit chain + CLI; it
+        // must mention all 3 component scores for debuggability.
+        let p = AnalysisPipeline::new();
+        let v = p.synthesize(
+            "pr/rs",
+            &Some(slop(0.33)),
+            &Some(sec(SecuritySeverity::Info)),
+            &Some(arch(0.44)),
+        );
+        assert!(v.reasoning.contains("slop=0.33"));
+        assert!(v.reasoning.contains("arch=0.44"));
+        assert!(v.reasoning.contains("Info"));
+    }
+}
