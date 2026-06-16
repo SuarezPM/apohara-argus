@@ -204,4 +204,148 @@ mod tests {
         assert_eq!(Decision::Warn.exit_code(), 0);
         assert_eq!(Decision::Block.exit_code(), 1);
     }
+
+    #[test]
+    fn as_str_returns_correct_strings() {
+        assert_eq!(Decision::Allow.as_str(), "ALLOW");
+        assert_eq!(Decision::Warn.as_str(), "WARN");
+        assert_eq!(Decision::Block.as_str(), "BLOCK");
+    }
+
+    #[test]
+    fn new_stores_nim_key_and_default_model() {
+        let r = GuardRunner::new("test-key");
+        assert_eq!(r.nim_key, "test-key");
+        assert!(r.nim_model.is_none());
+    }
+
+    #[test]
+    fn with_model_sets_nim_model() {
+        let r = GuardRunner::new("key").with_model("custom/model");
+        assert_eq!(r.nim_model.as_deref(), Some("custom/model"));
+    }
+
+    #[test]
+    fn read_diff_from_file_path() {
+        // The file-path branch of read_diff() reads the diff from
+        // disk. We create a temp file with a canned diff and
+        // verify the contents are returned verbatim.
+        let dir = std::env::temp_dir().join("argus-guard-read-diff-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let diff_path = dir.join("test.diff");
+        let diff_content = "+ let x = 1;\n- let x = 2;\n";
+        std::fs::write(&diff_path, diff_content).unwrap();
+        let result = GuardRunner::read_diff(Some(&diff_path)).expect("read ok");
+        assert_eq!(result, diff_content);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn read_diff_from_nonexistent_file_errors() {
+        // A non-existent file path must propagate the io::Error
+        // as an anyhow error. The function does not silently
+        // fall back to stdin when the path is Some(_).
+        let path = std::env::temp_dir().join("argus-guard-nonexistent-xyz.diff");
+        let _ = std::fs::remove_file(&path);
+        let result = GuardRunner::read_diff(Some(&path));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn render_terminal_allow_decision() {
+        // The terminal report must include the decision string,
+        // risk score, status, and summary. The icon is
+        // decision-specific (✅/⚠️/🛑).
+        let out = GuardOutput {
+            decision: Decision::Allow,
+            risk_score: 0.1,
+            verdict_status: VerdictStatus::Approved,
+            summary: "all clean".into(),
+            key_findings: vec![],
+            action_items: vec![],
+            slop_score: 0.1,
+            fit_score: 0.9,
+            security_summary: "no findings".into(),
+        };
+        let s = out.render_terminal();
+        assert!(s.contains("ALLOW"));
+        assert!(s.contains("0.10"));
+        assert!(s.contains("all clean"));
+        assert!(s.contains("✅"));
+        // No findings/action items sections when empty.
+        assert!(!s.contains("Findings:"));
+        assert!(!s.contains("Action items:"));
+    }
+
+    #[test]
+    fn render_terminal_warn_decision() {
+        let out = GuardOutput {
+            decision: Decision::Warn,
+            risk_score: 0.5,
+            verdict_status: VerdictStatus::ReviewRequired,
+            summary: "needs review".into(),
+            key_findings: vec!["verbose comments".into()],
+            action_items: vec!["simplify naming".into()],
+            slop_score: 0.5,
+            fit_score: 0.5,
+            security_summary: "2 findings".into(),
+        };
+        let s = out.render_terminal();
+        assert!(s.contains("WARN"));
+        assert!(s.contains("0.50"));
+        assert!(s.contains("⚠️"));
+        assert!(s.contains("verbose comments"));
+        assert!(s.contains("simplify naming"));
+        assert!(s.contains("Findings:"));
+        assert!(s.contains("Action items:"));
+    }
+
+    #[test]
+    fn render_terminal_block_decision() {
+        let out = GuardOutput {
+            decision: Decision::Block,
+            risk_score: 0.85,
+            verdict_status: VerdictStatus::Halted,
+            summary: "critical: hardcoded secret".into(),
+            key_findings: vec!["AWS key in diff".into()],
+            action_items: vec!["rotate the key".into()],
+            slop_score: 0.1,
+            fit_score: 0.9,
+            security_summary: "1 critical finding".into(),
+        };
+        let s = out.render_terminal();
+        assert!(s.contains("BLOCK"));
+        assert!(s.contains("0.85"));
+        assert!(s.contains("🛑"));
+        assert!(s.contains("AWS key in diff"));
+    }
+
+    #[test]
+    fn guard_output_serde_roundtrip() {
+        // The GuardOutput struct must round-trip through serde
+        // JSON without losing any field. This pins the public
+        // schema for any downstream consumer that reads the
+        // guard output from a file or stdout pipe.
+        let original = GuardOutput {
+            decision: Decision::Warn,
+            risk_score: 0.42,
+            verdict_status: VerdictStatus::ReviewRequired,
+            summary: "needs attention".into(),
+            key_findings: vec!["finding 1".into(), "finding 2".into()],
+            action_items: vec!["fix 1".into()],
+            slop_score: 0.5,
+            fit_score: 0.7,
+            security_summary: "no critical issues".into(),
+        };
+        let json = serde_json::to_string(&original).expect("serialize");
+        let restored: GuardOutput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(restored.decision, original.decision);
+        assert!((restored.risk_score - original.risk_score).abs() < 1e-6);
+        assert_eq!(restored.verdict_status, original.verdict_status);
+        assert_eq!(restored.summary, original.summary);
+        assert_eq!(restored.key_findings, original.key_findings);
+        assert_eq!(restored.action_items, original.action_items);
+        assert_eq!(restored.security_summary, original.security_summary);
+    }
 }
