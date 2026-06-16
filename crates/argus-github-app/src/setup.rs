@@ -27,8 +27,6 @@ use axum::{http::StatusCode, response::IntoResponse, Json};
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::app_state::AppState;
-
 /// The hard-coded manifest we serve at `GET /setup`.
 ///
 /// The fields are baked in at compile time so the manifest

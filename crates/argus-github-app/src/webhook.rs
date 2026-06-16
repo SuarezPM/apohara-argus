@@ -37,12 +37,6 @@ use crate::signature;
 const ACTIONS: &[&str] = &["opened", "synchronize", "reopened"];
 
 /// The label applied on the "deterministic-only" path. The
-/// spec calls for three labels; the deterministic layer can't
-/// distinguish `Approved` from `Halted` (that's the LLM's
-/// job), so we use a single "ran-and-found-nothing" label
-/// when the LLM is absent.
-const LABEL_DETERMINISTIC_ONLY: &str = "argus/reviewed";
-
 /// A flattened summary of the deterministic slop run, ready to
 /// be formatted into a comment + used to pick a label.
 #[derive(Debug)]
@@ -52,7 +46,6 @@ struct SlopSummary {
     error_count: usize,
     warning_count: usize,
     info_count: usize,
-    bullets: Vec<String>,
     body: String,
 }
 
@@ -282,7 +275,6 @@ fn summarize_signals(signals: &[SlopSignal]) -> SlopSummary {
         error_count,
         warning_count,
         info_count,
-        bullets,
         body,
     }
 }
@@ -398,7 +390,9 @@ mod tests {
         assert_eq!(s.info_count, 1);
         // 0.4 + 0.15 + 0.05 = 0.6
         assert!((s.score - 0.6).abs() < 0.01);
-        assert_eq!(s.bullets.len(), 3);
+        // The bullets are joined into `body` — verify the join
+        // happened (3 signals → 3 lines prefixed with "- `[rule]`").
+        assert_eq!(s.body.matches("- `[").count(), 3);
     }
 
     #[test]
