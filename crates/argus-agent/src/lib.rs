@@ -79,107 +79,11 @@ impl AgentSpec {
     /// Build the canonical AgentSpec for the 4 specialists + 2 orchestrators.
     pub fn canonical(role: AgentRole) -> Self {
         match role {
-            AgentRole::AegisSlop => Self {
-                spiffe_id: format!(
-                    "spiffe://apohara.dev/argus/aegis-slop/instance/{}",
-                    Uuid::new_v4()
-                ),
-                role,
-                prompt_name: "slop-detector".into(),
-                capabilities: vec![
-                    "detect_ai_slop_signals".into(),
-                    "score_slop_probability".into(),
-                    "extract_signal_examples".into(),
-                ],
-                context_required: ContextRequirement::DiffOnly,
-                constraints: vec![
-                    Constraint::MaxTemperature(0.1),
-                    Constraint::MustProduceJson("slop_report".into()),
-                ],
-                default_temperature: 0.1,
-                default_max_tokens: 1024,
-            },
-            AgentRole::AegisSecurity => Self {
-                spiffe_id: format!(
-                    "spiffe://apohara.dev/argus/aegis-security/instance/{}",
-                    Uuid::new_v4()
-                ),
-                role,
-                prompt_name: "redteam-security".into(),
-                capabilities: vec![
-                    "detect_hardcoded_secrets".into(),
-                    "detect_command_injection".into(),
-                    "detect_sql_injection".into(),
-                    "detect_path_traversal".into(),
-                    "detect_unsafe_deserialization".into(),
-                    "detect_crypto_misuse".into(),
-                    "detect_sensitive_data_in_logs".into(),
-                ],
-                context_required: ContextRequirement::DiffOnly,
-                constraints: vec![
-                    Constraint::MaxTemperature(0.0),
-                    Constraint::MustProduceJson("security_report".into()),
-                ],
-                default_temperature: 0.0,
-                default_max_tokens: 1536,
-            },
-            AgentRole::AegisArch => Self {
-                spiffe_id: format!(
-                    "spiffe://apohara.dev/argus/aegis-arch/instance/{}",
-                    Uuid::new_v4()
-                ),
-                role,
-                prompt_name: "architecture-fit".into(),
-                capabilities: vec![
-                    "evaluate_naming_conventions".into(),
-                    "detect_error_handling_consistency".into(),
-                    "detect_helper_reuse_opportunities".into(),
-                    "detect_logging_convention_consistency".into(),
-                    "score_architecture_fit".into(),
-                ],
-                context_required: ContextRequirement::DiffPlusRepoSample,
-                constraints: vec![
-                    Constraint::MaxTemperature(0.2),
-                    Constraint::MustProduceJson("arch_report".into()),
-                ],
-                default_temperature: 0.2,
-                default_max_tokens: 1280,
-            },
-            AgentRole::AegisVerdict => Self {
-                spiffe_id: format!(
-                    "spiffe://apohara.dev/argus/aegis-verdict/instance/{}",
-                    Uuid::new_v4()
-                ),
-                role,
-                prompt_name: "verdict-synthesizer".into(),
-                capabilities: vec![
-                    "synthesize_verdict_from_3_outputs".into(),
-                    "decide_approve_warn_halt".into(),
-                    "generate_action_items".into(),
-                ],
-                context_required: ContextRequirement::OtherAgentsOutputs,
-                constraints: vec![
-                    Constraint::NoRawCode,
-                    Constraint::MaxTemperature(0.3),
-                    Constraint::NoMergeDecisions,
-                ],
-                default_temperature: 0.3,
-                default_max_tokens: 1024,
-            },
-            AgentRole::AegisScope | AgentRole::AegisLens => Self {
-                spiffe_id: format!(
-                    "spiffe://apohara.dev/argus/aegis-{}/instance/{}",
-                    role.as_str(),
-                    Uuid::new_v4()
-                ),
-                role,
-                prompt_name: String::new(),
-                capabilities: vec!["orchestrate".into()],
-                context_required: ContextRequirement::DiffOnly,
-                constraints: vec![Constraint::NoMergeDecisions],
-                default_temperature: 0.0,
-                default_max_tokens: 0,
-            },
+            AgentRole::AegisSlop => aegis_slop_spec(role),
+            AgentRole::AegisSecurity => aegis_security_spec(role),
+            AgentRole::AegisArch => aegis_arch_spec(role),
+            AgentRole::AegisVerdict => aegis_verdict_spec(role),
+            AgentRole::AegisScope | AgentRole::AegisLens => aegis_orchestrator_spec(role),
         }
     }
 
@@ -193,6 +97,140 @@ impl AgentSpec {
     /// Returns true if this agent requires diff-only context.
     pub fn diff_only(&self) -> bool {
         matches!(self.context_required, ContextRequirement::DiffOnly)
+    }
+}
+
+/// AegisSlop specialist: AI-generated slop detection. Low temperature
+/// (0.1) keeps the JSON output reproducible. Output: `slop_report`.
+fn aegis_slop_spec(role: AgentRole) -> AgentSpec {
+    AgentSpec {
+        spiffe_id: format!(
+            "spiffe://apohara.dev/argus/aegis-slop/instance/{}",
+            Uuid::new_v4()
+        ),
+        role,
+        prompt_name: "slop-detector".into(),
+        capabilities: vec![
+            "detect_ai_slop_signals".into(),
+            "score_slop_probability".into(),
+            "extract_signal_examples".into(),
+        ],
+        context_required: ContextRequirement::DiffOnly,
+        constraints: vec![
+            Constraint::MaxTemperature(0.1),
+            Constraint::MustProduceJson("slop_report".into()),
+        ],
+        default_temperature: 0.1,
+        default_max_tokens: 1024,
+    }
+}
+
+/// AegisSecurity specialist: red-team security review. Zero
+/// temperature (deterministic for repeatable findings). Output:
+/// `security_report`.
+fn aegis_security_spec(role: AgentRole) -> AgentSpec {
+    AgentSpec {
+        spiffe_id: format!(
+            "spiffe://apohara.dev/argus/aegis-security/instance/{}",
+            Uuid::new_v4()
+        ),
+        role,
+        prompt_name: "redteam-security".into(),
+        capabilities: vec![
+            "detect_hardcoded_secrets".into(),
+            "detect_command_injection".into(),
+            "detect_sql_injection".into(),
+            "detect_path_traversal".into(),
+            "detect_unsafe_deserialization".into(),
+            "detect_crypto_misuse".into(),
+            "detect_sensitive_data_in_logs".into(),
+        ],
+        context_required: ContextRequirement::DiffOnly,
+        constraints: vec![
+            Constraint::MaxTemperature(0.0),
+            Constraint::MustProduceJson("security_report".into()),
+        ],
+        default_temperature: 0.0,
+        default_max_tokens: 1536,
+    }
+}
+
+/// AegisArch specialist: architecture-fit review. Needs diff +
+/// repo sample (to detect naming + helper-reuse patterns).
+/// Output: `arch_report`.
+fn aegis_arch_spec(role: AgentRole) -> AgentSpec {
+    AgentSpec {
+        spiffe_id: format!(
+            "spiffe://apohara.dev/argus/aegis-arch/instance/{}",
+            Uuid::new_v4()
+        ),
+        role,
+        prompt_name: "architecture-fit".into(),
+        capabilities: vec![
+            "evaluate_naming_conventions".into(),
+            "detect_error_handling_consistency".into(),
+            "detect_helper_reuse_opportunities".into(),
+            "detect_logging_convention_consistency".into(),
+            "score_architecture_fit".into(),
+        ],
+        context_required: ContextRequirement::DiffPlusRepoSample,
+        constraints: vec![
+            Constraint::MaxTemperature(0.2),
+            Constraint::MustProduceJson("arch_report".into()),
+        ],
+        default_temperature: 0.2,
+        default_max_tokens: 1280,
+    }
+}
+
+/// AegisVerdict specialist: synthesizes the 3 specialist outputs
+/// into an approve / warn / halt decision. The `NoRawCode`
+/// constraint enforces the Cordon Principle — the verdict
+/// synthesizer must NEVER see raw diff text, only the
+/// `RedactedSpecialistReport` from each upstream specialist.
+fn aegis_verdict_spec(role: AgentRole) -> AgentSpec {
+    AgentSpec {
+        spiffe_id: format!(
+            "spiffe://apohara.dev/argus/aegis-verdict/instance/{}",
+            Uuid::new_v4()
+        ),
+        role,
+        prompt_name: "verdict-synthesizer".into(),
+        capabilities: vec![
+            "synthesize_verdict_from_3_outputs".into(),
+            "decide_approve_warn_halt".into(),
+            "generate_action_items".into(),
+        ],
+        context_required: ContextRequirement::OtherAgentsOutputs,
+        constraints: vec![
+            Constraint::NoRawCode,
+            Constraint::MaxTemperature(0.3),
+            Constraint::NoMergeDecisions,
+        ],
+        default_temperature: 0.3,
+        default_max_tokens: 1024,
+    }
+}
+
+/// Orchestrator role (AegisScope or AegisLens). Orchestrators
+/// don't run their own LLM call — they route the diff through
+/// the 3 specialists and synthesize the result. Hence
+/// `default_max_tokens: 0` (no completion) and an empty
+/// `prompt_name` (no prompt to load).
+fn aegis_orchestrator_spec(role: AgentRole) -> AgentSpec {
+    AgentSpec {
+        spiffe_id: format!(
+            "spiffe://apohara.dev/argus/aegis-{}/instance/{}",
+            role.as_str(),
+            Uuid::new_v4()
+        ),
+        role,
+        prompt_name: String::new(),
+        capabilities: vec!["orchestrate".into()],
+        context_required: ContextRequirement::DiffOnly,
+        constraints: vec![Constraint::NoMergeDecisions],
+        default_temperature: 0.0,
+        default_max_tokens: 0,
     }
 }
 
