@@ -235,6 +235,7 @@ jobs:
       - name: Create draft GitHub Release
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         with:
+          tag_name: v0.1.0
           draft: true
           generate_release_notes: true
           files: |
