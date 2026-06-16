@@ -60,58 +60,30 @@ pub async fn webhook_handler(
     headers: HeaderMap,
     body: Bytes,
 ) -> impl IntoResponse {
-    // 1. Size cap (cheapest check, do it first).
     let cordon = CordonEnforcer::new();
-    if let Err(err) = cordon.check_size(&body) {
-        warn!(error = %err, "webhook payload too large");
-        return (StatusCode::PAYLOAD_TOO_LARGE, err.to_string()).into_response();
-    }
 
-    // 2. Signature.
-    let sig_header = headers
-        .get("x-hub-signature-256")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
-    if let Err(err) = signature::verify(state.config.webhook_secret.as_bytes(), sig_header, &body) {
-        warn!(error = %err, "webhook signature verification failed");
-        return (StatusCode::UNAUTHORIZED, "invalid signature".to_string()).into_response();
+    // Pipeline of cheap→expensive validations. Each step returns
+    // either the validated value or an HTTP error response; the
+    // `?`-style early-return via `if let Err(resp) = ...` keeps
+    // this handler a flat list of guard clauses (cognitive
+    // complexity ~10, down from 65).
+    if let Err(resp) = check_payload_size(&cordon, &body) {
+        return resp;
     }
-
-    // 3. Event type.
-    let event = headers
-        .get("x-github-event")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
-    if let Err(err) = cordon.check_event(&state.config, event) {
-        // 422 = unprocessable entity — the event is
-        // syntactically valid but we don't act on it.
-        warn!(error = %err, "webhook event not in allowlist");
-        return (StatusCode::UNPROCESSABLE_ENTITY, err.to_string()).into_response();
+    if let Err(resp) = check_signature(&state, &headers, &body) {
+        return resp;
     }
-
-    // 4. Parse the body.
-    let payload: PullRequestPayload = match serde_json::from_slice(&body) {
+    if let Err(resp) = check_event_allowlisted(&state, &cordon, &headers) {
+        return resp;
+    }
+    let payload = match parse_payload(&body) {
         Ok(p) => p,
-        Err(e) => {
-            warn!(error = %e, "webhook payload failed to parse");
-            return (StatusCode::BAD_REQUEST, format!("invalid JSON: {}", e)).into_response();
-        }
+        Err(resp) => return resp,
     };
-
-    // 5. Repo allowlist + SSRF check.
-    if let Err(err) = cordon.check_repo(&state.config, &payload.repository.full_name) {
-        warn!(error = %err, repo = %payload.repository.full_name, "repo not in allowlist");
-        return (StatusCode::FORBIDDEN, err.to_string()).into_response();
+    if let Err(resp) = check_repo_and_ssrf(&state, &cordon, &payload) {
+        return resp;
     }
-    if let Ok(value) = serde_json::to_value(&payload) {
-        if let Err(err) = cordon.check_no_ssrf(&value) {
-            warn!(error = %err, "payload contained untrusted URL");
-            return (StatusCode::UNPROCESSABLE_ENTITY, err.to_string()).into_response();
-        }
-    }
-
-    // 6. Action filter.
-    if !ACTIONS.contains(&payload.action.as_str()) {
+    if !is_pr_action(&payload) {
         info!(
             action = %payload.action,
             repo = %payload.repository.full_name,
@@ -121,24 +93,11 @@ pub async fn webhook_handler(
         return (StatusCode::OK, "ignored: non-PR-action event").into_response();
     }
 
-    // 7. Hand off to the async pipeline.
+    // Build the GitHub client + spawn the async pipeline.
     let config = state.config.clone();
-    let gh = match std::env::var("ARGUS_APP_INSTALL_TOKEN") {
-        Ok(t) if !t.is_empty() => {
-            // Production hard-codes https://api.github.com;
-            // `ARGUS_GITHUB_API_BASE_URL` is a test-only override
-            // (the integration tests point it at a mock server).
-            // When the env var is unset, we get the default
-            // `https://api.github.com` — no behavior change.
-            let mut client = GitHubClient::new(t);
-            if let Ok(base) = std::env::var("ARGUS_GITHUB_API_BASE_URL") {
-                if !base.is_empty() {
-                    client = client.with_base_url(base);
-                }
-            }
-            client
-        }
-        _ => {
+    let gh = match build_github_client() {
+        Some(gh) => gh,
+        None => {
             warn!("ARGUS_APP_INSTALL_TOKEN not set at webhook time; skipping review");
             return (StatusCode::OK, "queued: install token not configured").into_response();
         }
@@ -150,6 +109,138 @@ pub async fn webhook_handler(
     });
 
     (StatusCode::OK, "queued").into_response()
+}
+
+/// Cheap-first guard: payload size must be under the CordonEnforcer
+/// limit (default 1 MiB). Done before signature verification because
+/// reading 1 MiB to compute HMAC is expensive; rejecting at 1 MiB+1
+/// saves the crypto work.
+///
+/// `#[allow(clippy::result_large_err)]` — `axum::response::Response`
+/// is 128+ bytes (it embeds a `Body` enum). Boxing the Err variant
+/// would add an allocation on every error path for no real win
+/// (error paths are cold). The Ok path stays zero-cost.
+#[allow(clippy::result_large_err)]
+fn check_payload_size(cordon: &CordonEnforcer, body: &Bytes) -> Result<(), axum::response::Response> {
+    if let Err(err) = cordon.check_size(body) {
+        warn!(error = %err, "webhook payload too large");
+        Err((StatusCode::PAYLOAD_TOO_LARGE, err.to_string()).into_response())
+    } else {
+        Ok(())
+    }
+}
+
+/// Verify the `X-Hub-Signature-256` HMAC. The `X-Hub-Signature-256`
+/// header carries `sha256=<hex>`; we recompute over the raw body
+/// bytes (NOT a re-serialized JSON) so whitespace changes don't
+/// invalidate the signature.
+#[allow(clippy::result_large_err)]
+fn check_signature(
+    state: &AppState,
+    headers: &HeaderMap,
+    body: &Bytes,
+) -> Result<(), axum::response::Response> {
+    let sig_header = headers
+        .get("x-hub-signature-256")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    if let Err(err) = signature::verify(
+        state.config.webhook_secret.as_bytes(),
+        sig_header,
+        body,
+    ) {
+        warn!(error = %err, "webhook signature verification failed");
+        Err((StatusCode::UNAUTHORIZED, "invalid signature".to_string()).into_response())
+    } else {
+        Ok(())
+    }
+}
+
+/// Reject events outside the operator's `event_allowlist`. 422 (not
+/// 400) because the event is syntactically valid — we just don't
+/// act on it.
+#[allow(clippy::result_large_err)]
+fn check_event_allowlisted(
+    state: &AppState,
+    cordon: &CordonEnforcer,
+    headers: &HeaderMap,
+) -> Result<(), axum::response::Response> {
+    let event = headers
+        .get("x-github-event")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    if let Err(err) = cordon.check_event(&state.config, event) {
+        warn!(error = %err, "webhook event not in allowlist");
+        Err((StatusCode::UNPROCESSABLE_ENTITY, err.to_string()).into_response())
+    } else {
+        Ok(())
+    }
+}
+
+/// Parse the raw body into our typed payload. Done AFTER signature
+/// verification so a malformed-JSON attacker can't probe the schema
+/// without a valid HMAC.
+#[allow(clippy::result_large_err)]
+fn parse_payload(body: &Bytes) -> Result<PullRequestPayload, axum::response::Response> {
+    serde_json::from_slice(body).map_err(|e| {
+        warn!(error = %e, "webhook payload failed to parse");
+        (StatusCode::BAD_REQUEST, format!("invalid JSON: {}", e)).into_response()
+    })
+}
+
+/// Two-step guard: (a) the repo must be in the operator's
+/// `allowed_repos` allowlist, and (b) the serialized payload must
+/// not contain URLs pointing to private network ranges (SSRF guard —
+/// if a future field gets URL-typed and the operator adds a
+/// check_url feature, this is where it plugs in).
+#[allow(clippy::result_large_err)]
+fn check_repo_and_ssrf(
+    state: &AppState,
+    cordon: &CordonEnforcer,
+    payload: &PullRequestPayload,
+) -> Result<(), axum::response::Response> {
+    if let Err(err) = cordon.check_repo(&state.config, &payload.repository.full_name) {
+        warn!(error = %err, repo = %payload.repository.full_name, "repo not in allowlist");
+        return Err((StatusCode::FORBIDDEN, err.to_string()).into_response());
+    }
+    if let Ok(value) = serde_json::to_value(payload) {
+        if let Err(err) = cordon.check_no_ssrf(&value) {
+            warn!(error = %err, "payload contained untrusted URL");
+            return Err((StatusCode::UNPROCESSABLE_ENTITY, err.to_string()).into_response());
+        }
+    }
+    Ok(())
+}
+
+/// Only act on PR-action events. We do this last (after all
+/// other validations) because an event like `push` to a non-allowlisted
+/// repo is harmless — the early returns cover the dangerous cases.
+fn is_pr_action(payload: &PullRequestPayload) -> bool {
+    ACTIONS.contains(&payload.action.as_str())
+}
+
+/// Build the GitHub client from the install token + optional
+/// test-only base URL override. Returns `None` if the install
+/// token is not configured (the webhook should ack the event
+/// with 200 even in that case — the event is delivered, we just
+/// can't act on it).
+fn build_github_client() -> Option<GitHubClient> {
+    let token = std::env::var("ARGUS_APP_INSTALL_TOKEN").ok()?;
+    if token.is_empty() {
+        return None;
+    }
+    // Production hard-codes https://api.github.com;
+    // `ARGUS_GITHUB_API_BASE_URL` is a test-only override
+    // (the integration tests point it at a mock server).
+    // When the env var is unset, we get the default
+    // `https://api.github.com` — no behavior change.
+    let mut client = GitHubClient::new(token);
+    if let Ok(base) = std::env::var("ARGUS_GITHUB_API_BASE_URL") {
+        if !base.is_empty() {
+            client = client.with_base_url(base);
+        }
+    }
+    Some(client)
 }
 
 /// The actual review work. Spawned in a `tokio::spawn` so the
