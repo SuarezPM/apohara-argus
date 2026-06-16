@@ -576,4 +576,29 @@ mod tests {
             res
         );
     }
+
+    // Full happy-path test for `analyze()` was attempted but
+    // removed: the `tokio::join!` in `AnalysisPipeline::run()`
+    // calls 3 specialists concurrently, and the `NimClient`'s
+    // `prev_hash` mutex (a `std::sync::Mutex` acquired *after*
+    // the inner HTTP call completes) serializes the audit-event
+    // emission in a way that races with the 3 concurrent HTTP
+    // responses from the mock server. The mock server receives
+    // all 3 connections (verified via an `AtomicUsize` counter)
+    // but the audit events are not consistently emitted within
+    // the test's lifetime.
+    //
+    // The 3 error-path tests above (`analyze_without_github_client`,
+    // `analyze_with_invalid_pr_url`, `analyze_with_github_client_but_no_nim_key`)
+    // cover the first 25 LoC of `analyze()`. The remaining
+    // ~190 LoC (diff fetch success, pipeline run, review build,
+    // audit event emission, response assembly) require a refactor
+    // of `NimClient` to use `tokio::sync::Mutex` for `prev_hash`
+    // (or to move the audit emission outside the mutex) to be
+    // testable without races. That's a production-code change
+    // outside the scope of the coverage push.
+    //
+    // The integration test at `tests/pipeline_e2e.rs` (gated
+    // behind `ARGUS_NIM_KEY` + network access) covers the full
+    // happy path in CI.
 }
