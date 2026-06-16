@@ -245,8 +245,8 @@ impl LlmClient for NimClient {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::Message;
+    use super::*;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
 

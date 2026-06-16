@@ -17,6 +17,27 @@ project adheres to
   CI — ubuntu + macos + windows + clippy + rustfmt +
   cargo-deny) is green as of commit `6fccb09`.
 
+- **Test coverage reached 80.69%** (from 62.85%), meeting
+  the bestpractices.dev `test_statement_coverage80`
+  threshold. 15 commits added ~250 tests across 12 crates:
+  argus-slop zero-coverage files (75 tests, 810 LoC),
+  argus-llm HTTP mock tests (29 tests, 379 LoC via
+  tokio::net::TcpListener, no new dev-dep),
+  argus-verify main.rs handlers (8 tests, 299 LoC),
+  apohara-argus-core prompts/config loaders (20 tests,
+  370 LoC), argus-lens aggregate + render_markdown
+  (9 tests, 144 LoC), argus-guard Decision +
+  GuardOutput (8 tests, 144 LoC), argus-benchmarks
+  dataset + MockNimClient (22 tests, 347 LoC), and
+  smaller batches in argus-otel, argus-slop
+  pipeline_mock, argus-llm MockClient, and
+  argus-verify analyze() error paths. Per-crate
+  breakdown: argus-benchmarks 98.77%, apohara-argus-core
+  95.28%, argus-llm ~100%, argus-lens 87.71%, argus-slop
+  ~85%, argus-verify ~76%, argus-guard 68%. See
+  `docs/coverage.md` for the full table and the
+  commit-by-commit test additions.
+
 ### Fixed
 
 - **CI was red on `main`** before this release. Six surgical
