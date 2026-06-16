@@ -224,3 +224,222 @@ async fn analyze(
 
     Ok(Json(resp))
 }
+
+#[cfg(test)]
+mod tests {
+    //! In-process handler tests using `tower::ServiceExt::oneshot`.
+    //! No new dev-deps needed: `tower` is already a dep of
+    //! `axum` and `argus-verify`. We test:
+    //! - `health()`: simple JSON response, no state required.
+    //! - `analyze()`: 401 when no NIM key, cache hit returns
+    //!   cached value, cache miss + bad NIM key propagates
+    //!   worker error.
+    //!
+    //! The `analyze()` handler calls `state.worker.analyze()`
+    //! which makes a real HTTP call to the NIM endpoint. We avoid
+    //! that by either returning early (401, cache hit) or by
+    //! pointing the worker at a deliberately-unreachable URL
+    //! so the call fails fast and surfaces as a 500.
+
+    use super::*;
+    use apohara_argus_core::{FixPlan, PRReview, Verdict, VerdictStatus};
+    use argus_verify::AnalyzeResponse;
+    use axum::body::{to_bytes, Body};
+    use axum::http::{Request, StatusCode};
+    use chrono::Utc;
+    use tower::ServiceExt;
+    use uuid::Uuid;
+
+    /// Serializes tests that read/write `ARGUS_NIM_KEY` via the
+    /// process env. The `analyze` handler calls
+    /// `std::env::set_var("ARGUS_NIM_KEY", …)` when a key is
+    /// provided in the `X-LLM-Key` header — that side effect
+    /// leaks across tests if they run in parallel. The lock
+    /// forces sequential execution of env-touching tests.
+    /// We use `tokio::sync::Mutex` (not `std::sync::Mutex`)
+    /// because the guard must be held across `.await` points
+    /// (e.g., `app.oneshot(req).await`); `std::sync::MutexGuard`
+    /// is not `Send` and would trigger `clippy::await_holding_lock`.
+    static ENV_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    /// Build an `AppState` with a `VerifyWorker` pointed at an
+    /// unreachable URL. When the worker actually tries to call
+    /// the LLM, it fails with a connection error in < 1s.
+    fn make_test_state() -> AppState {
+        // Port 1 is reserved and almost never bound. The worker
+        // will fail with a connection error (not a timeout) when
+        // it tries to call the LLM.
+        let worker = Arc::new(VerifyWorker::new("http://127.0.0.1:1/v1"));
+        let cache = IdempotencyCache::new();
+        AppState { worker, cache }
+    }
+
+    /// Clear the `ARGUS_NIM_KEY` env var so the "no NIM key" test
+    /// is deterministic regardless of the test environment.
+    fn clear_nim_key_env() {
+        // Safe on Rust ≥ 1.86 because we use `remove_var` only in
+        // tests; production code uses `set_var` (which IS unsafe
+        // on 1.86+, but we never call it from production here).
+        // We accept the unsafe block because the test is the only
+        // place that touches the process env.
+        #[allow(unused_unsafe)]
+        unsafe {
+            std::env::remove_var("ARGUS_NIM_KEY");
+        }
+    }
+
+    #[tokio::test]
+    async fn health_returns_ok_json() {
+        let app = Router::new().route("/health", get(health));
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = to_bytes(resp.into_body(), 4096).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["status"], "ok");
+        assert_eq!(json["service"], "argus-verify");
+        assert!(json["version"].is_string());
+    }
+
+    #[tokio::test]
+    async fn analyze_returns_401_when_no_nim_key() {
+        let _env_guard = ENV_LOCK.lock().await;
+        clear_nim_key_env();
+        let state = make_test_state();
+        let app = Router::new()
+            .route("/analyze", post(analyze))
+            .with_state(state);
+        let req = Request::builder()
+            .method("POST")
+            .uri("/analyze")
+            .header("content-type", "application/json")
+            .body(Body::from(r#"{"pr_url":"https://github.com/x/y/pull/1"}"#))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn analyze_returns_cached_when_idempotency_hit() {
+        let _env_guard = ENV_LOCK.lock().await;
+        clear_nim_key_env();
+        let state = make_test_state();
+        let cache = state.cache.clone();
+        // Build a valid `AnalyzeResponse` in Rust and serialize it
+        // to JSON. This guarantees the cached value has the exact
+        // shape that the handler's `serde_json::from_value` call
+        // expects (including RiskScore's serde-transparent repr,
+        // VerdictStatus's SCREAMING_SNAKE_CASE, and DateTime<Utc>'s
+        // ISO 8601 format). Hand-crafting the JSON is fragile
+        // because nested types have non-obvious serialization rules.
+        let key = "test-cache-key";
+        let pr_url = "https://github.com/x/y/pull/42";
+        let now = Utc::now();
+        let verdict = Verdict {
+            status: VerdictStatus::Approved,
+            risk_score: apohara_argus_core::RiskScore(0.1),
+            summary: "cached verdict".into(),
+            key_findings: vec![],
+            action_items: vec![],
+            reasoning: "test cache hit".into(),
+            issued_at: now,
+        };
+        let review = PRReview {
+            id: Uuid::nil(),
+            pr_ref: pr_url.to_string(),
+            pr_commit_hash: "abc123".into(),
+            verdict: verdict.clone(),
+            findings: vec![],
+            agent_chain: vec![],
+            created_at: now,
+            ledger_signature: String::new(),
+            prev_ledger_hash: String::new(),
+        };
+        let cached_resp = AnalyzeResponse {
+            pr_ref: pr_url.to_string(),
+            verdict: verdict.clone(),
+            slop_score: None,
+            fit_score: None,
+            security_summary: None,
+            review,
+            comment_posted: false,
+            labels_set: false,
+            fix_plan: FixPlan::empty(),
+        };
+        let cached = serde_json::to_value(&cached_resp).unwrap();
+        cache.put(key.to_string(), pr_url.to_string(), cached).await;
+
+        let app = Router::new()
+            .route("/analyze", post(analyze))
+            .with_state(state);
+        let req = Request::builder()
+            .method("POST")
+            .uri("/analyze")
+            .header("content-type", "application/json")
+            .header("x-idempotency-key", key)
+            .body(Body::from(format!(r#"{{"pr_url":"{}"}}"#, pr_url)))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = to_bytes(resp.into_body(), 4096).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["verdict"]["status"], "APPROVED");
+        assert_eq!(json["verdict"]["summary"], "cached verdict");
+        assert_eq!(json["pr_ref"], pr_url);
+    }
+
+    #[tokio::test]
+    async fn analyze_returns_500_when_worker_fails() {
+        let _env_guard = ENV_LOCK.lock().await;
+        clear_nim_key_env();
+        let state = make_test_state();
+        let app = Router::new()
+            .route("/analyze", post(analyze))
+            .with_state(state);
+        // Provide a NIM key so the handler proceeds past the 401
+        // check, then the worker fails because port 1 is unbound.
+        let req = Request::builder()
+            .method("POST")
+            .uri("/analyze")
+            .header("content-type", "application/json")
+            .header("x-llm-key", "fake-key")
+            .body(Body::from(r#"{"pr_url":"https://github.com/x/y/pull/1"}"#))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[tokio::test]
+    async fn analyze_returns_500_on_cache_corruption() {
+        let _env_guard = ENV_LOCK.lock().await;
+        clear_nim_key_env();
+        let state = make_test_state();
+        let cache = state.cache.clone();
+        // Pre-populate the cache with a value that cannot be
+        // deserialized as AnalyzeResponse (wrong shape).
+        let key = "corrupt-key";
+        let pr_url = "https://github.com/x/y/pull/99";
+        let bad = serde_json::json!({"this_is_not_a_verdict": 42});
+        cache.put(key.to_string(), pr_url.to_string(), bad).await;
+
+        let app = Router::new()
+            .route("/analyze", post(analyze))
+            .with_state(state);
+        let req = Request::builder()
+            .method("POST")
+            .uri("/analyze")
+            .header("content-type", "application/json")
+            .header("x-idempotency-key", key)
+            .body(Body::from(format!(r#"{{"pr_url":"{}"}}"#, pr_url)))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+}
