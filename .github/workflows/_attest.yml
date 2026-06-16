@@ -96,8 +96,16 @@ jobs:
   provenance:
     name: SLSA Build L3 (.intoto.jsonl)
     needs: stage
+    # `attestations: write` is REQUIRED for the SLSA L3 generator
+    # to publish the .intoto.jsonl to the Rekor transparency log.
+    # Without it, the generator silently fails to produce a
+    # usable attestation (the intoto.jsonl is generated but
+    # never published). The top-level `permissions:` block
+    # already grants this, but job-level `permissions:`
+    # OVERRIDES the workflow-level — so we must repeat it here.
     permissions:
       id-token: write
+      attestations: write
       contents: read
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@f7dd8c54c2067bafc12ca7a55595d5ee9b75204a # v2.1.0
     with:
