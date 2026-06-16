@@ -257,11 +257,7 @@ async fn handle_pr_event(
     payload: PullRequestPayload,
     gh: GitHubClient,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let (owner, repo, number) = (
-        payload.repository.full_name.split('/').next().unwrap_or(""),
-        payload.repository.full_name.split('/').nth(1).unwrap_or(""),
-        payload.number,
-    );
+    let (owner, repo, number) = parse_repo_full_name(&payload.repository.full_name, payload.number);
 
     info!(
         repo = %payload.repository.full_name,
@@ -279,40 +275,8 @@ async fn handle_pr_event(
 
     let (label_slug, comment_body) = compose_verdict(&config, &payload, &slop);
 
-    // Post the comment.
-    if let Err(e) = gh.post_comment(owner, repo, number, &comment_body).await {
-        warn!(
-            error = %e,
-            repo = %payload.repository.full_name,
-            number,
-            "failed to post comment"
-        );
-    } else {
-        info!(
-            repo = %payload.repository.full_name,
-            number,
-            "posted ARGUS verdict comment"
-        );
-    }
-
-    // Set the label.
-    let label = config.label_for(label_slug);
-    if let Err(e) = gh.set_labels(owner, repo, number, &[label]).await {
-        warn!(
-            error = %e,
-            repo = %payload.repository.full_name,
-            number,
-            label,
-            "failed to set label"
-        );
-    } else {
-        info!(
-            repo = %payload.repository.full_name,
-            number,
-            label,
-            "set ARGUS label"
-        );
-    }
+    post_verdict_comment(&gh, owner, repo, number, &payload.repository.full_name, &comment_body).await;
+    set_verdict_label(&gh, &config, label_slug, owner, repo, number, &payload.repository.full_name).await;
 
     // Emit an audit-friendly log line. The full
     // argus-verify audit chain (BLAKE3 + Ed25519) is
@@ -322,6 +286,77 @@ async fn handle_pr_event(
     emit_audit_receipt(owner, repo, number, &diff, &slop);
 
     Ok(())
+}
+
+/// Split `"owner/repo"` into `(owner, repo)`. Returns empty strings
+/// on malformed input (the CordonEnforcer's repo allowlist will
+/// then reject it on the next pass; we don't want to panic here
+/// on a malformed payload — just degrade gracefully).
+fn parse_repo_full_name(full_name: &str, number: u32) -> (&str, &str, u32) {
+    let mut parts = full_name.splitn(3, '/');
+    let owner = parts.next().unwrap_or("");
+    let repo = parts.next().unwrap_or("");
+    (owner, repo, number)
+}
+
+/// Post the verdict comment to the PR. Failures are logged at
+/// WARN (not propagated) — a failed comment post must NOT fail
+/// the whole review, because the label may still land and
+/// the operator can see the failure in the logs.
+async fn post_verdict_comment(
+    gh: &GitHubClient,
+    owner: &str,
+    repo: &str,
+    number: u32,
+    full_name: &str,
+    body: &str,
+) {
+    if let Err(e) = gh.post_comment(owner, repo, number, body).await {
+        warn!(
+            error = %e,
+            repo = %full_name,
+            number,
+            "failed to post comment"
+        );
+    } else {
+        info!(
+            repo = %full_name,
+            number,
+            "posted ARGUS verdict comment"
+        );
+    }
+}
+
+/// Set the verdict label on the PR. Same failure semantics as
+/// `post_verdict_comment` — log and move on. The label slug comes
+/// from `compose_verdict` and is mapped to a label string by
+/// `AppConfig::label_for`.
+async fn set_verdict_label(
+    gh: &GitHubClient,
+    config: &AppConfig,
+    label_slug: &str,
+    owner: &str,
+    repo: &str,
+    number: u32,
+    full_name: &str,
+) {
+    let label = config.label_for(label_slug);
+    if let Err(e) = gh.set_labels(owner, repo, number, &[label]).await {
+        warn!(
+            error = %e,
+            repo = %full_name,
+            number,
+            label,
+            "failed to set label"
+        );
+    } else {
+        info!(
+            repo = %full_name,
+            number,
+            label,
+            "set ARGUS label"
+        );
+    }
 }
 
 /// Flatten the slop signals into the shape the comment + label
