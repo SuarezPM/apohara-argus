@@ -39,5 +39,3 @@ rand = { workspace = true }
 
 [features]
 default = []
-dalle = []
-heygen = []

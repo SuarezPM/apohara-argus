@@ -31,11 +31,7 @@ pub mod test_util;
 
 pub use model_registry::{ModelRegistry, ModelRole};
 
-#[cfg(feature = "dalle")]
-pub mod dalle;
 
-#[cfg(feature = "heygen")]
-pub mod heygen;
 
 pub use circuit_breaker::{CircuitBreakerConfig, CircuitError, CircuitState, LlmCircuitBreaker};
 pub use mock::MockClient;
