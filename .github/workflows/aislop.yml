@@ -9,9 +9,18 @@ on:
 # Default to least-privilege. The `scan` job only needs `contents:
 # read` (it checks out the repo and uploads a report artifact), so
 # this satisfies Scorecard's TokenPermissions check without
-# granting write access the workflow doesn't use.
+# granting write access the workflow doesn't use. The
+# `pull-requests: write` permission is required by the
+# `peter-evans/create-or-update-comment` action in the
+# "Comment on PR" step below — without it the action fails with
+# "Resource not accessible by integration" on every PR run, which
+# has been blocking the merge of valid PRs (see PRs #12 and #14
+# in the apohara-argus repo). The `pull-requests: write` scope
+# is narrowly scoped to PR comments only — it does not grant
+# merge, push, or admin access.
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   scan:
