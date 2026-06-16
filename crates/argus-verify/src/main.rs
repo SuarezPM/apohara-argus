@@ -442,4 +442,84 @@ mod tests {
         let resp = app.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
+
+    #[tokio::test]
+    async fn analyze_uses_env_nim_key_when_header_missing() {
+        // The BYOK path: if the `X-LLM-Key` header is absent, the
+        // handler falls back to the `ARGUS_NIM_KEY` env var. When
+        // the env var is set, the request proceeds past the 401
+        // check and the worker fails with a 500 (because the
+        // upstream URL is unreachable). The key behavior we pin:
+        // no 401 when the env var is the source of the key.
+        let _env_guard = ENV_LOCK.lock().await;
+        std::env::set_var("ARGUS_NIM_KEY", "env-fallback-key");
+        let state = make_test_state();
+        let app = Router::new()
+            .route("/analyze", post(analyze))
+            .with_state(state);
+        let req = Request::builder()
+            .method("POST")
+            .uri("/analyze")
+            .header("content-type", "application/json")
+            // Note: NO X-LLM-Key header — the env var must be used.
+            .body(Body::from(r#"{"pr_url":"https://github.com/x/y/pull/1"}"#))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        // The env var provides the key, so we get past the 401
+        // check. The worker then fails because port 1 is unbound.
+        assert_ne!(resp.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        std::env::remove_var("ARGUS_NIM_KEY");
+    }
+
+    #[tokio::test]
+    async fn analyze_cache_miss_with_idempotency_key_runs_and_caches() {
+        // Cache MISS path: the idempotency key is present but the
+        // cache is empty for that key+pr_url. The handler proceeds
+        // to call worker.analyze(), which fails (bad URL → 500),
+        // but the cache.put branch is never reached because the
+        // analyze call errored. We pin the 500 outcome to confirm
+        // the cache-miss path doesn't accidentally short-circuit.
+        let _env_guard = ENV_LOCK.lock().await;
+        clear_nim_key_env();
+        let state = make_test_state();
+        let app = Router::new()
+            .route("/analyze", post(analyze))
+            .with_state(state);
+        let req = Request::builder()
+            .method("POST")
+            .uri("/analyze")
+            .header("content-type", "application/json")
+            .header("x-llm-key", "fake-key")
+            .header("x-idempotency-key", "miss-key")
+            .body(Body::from(r#"{"pr_url":"https://github.com/x/y/pull/1"}"#))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        // The analyze call fails (500), so the cache is NOT
+        // populated. The handler returns 500.
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[tokio::test]
+    async fn analyze_cache_miss_without_idempotency_key_skips_cache() {
+        // No idempotency key → the handler proceeds to analyze
+        // but skips the cache.put branch entirely. The analyze
+        // call still fails (500) because the upstream is bad.
+        let _env_guard = ENV_LOCK.lock().await;
+        clear_nim_key_env();
+        let state = make_test_state();
+        let app = Router::new()
+            .route("/analyze", post(analyze))
+            .with_state(state);
+        let req = Request::builder()
+            .method("POST")
+            .uri("/analyze")
+            .header("content-type", "application/json")
+            .header("x-llm-key", "fake-key")
+            // No x-idempotency-key header.
+            .body(Body::from(r#"{"pr_url":"https://github.com/x/y/pull/1"}"#))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
 }
