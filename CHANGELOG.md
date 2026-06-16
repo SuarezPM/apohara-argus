@@ -9,6 +9,12 @@ project adheres to
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-06-16
+
+Initial release of **ARGUS** — a hybrid (deterministic regex +
+LLM semantic) defense layer for AI-generated code, packaged as a
+15-crate Rust workspace. (Tag `v0.1.0` cut at commit `bf5961d`.)
+
 ### Added
 
 - **CI passing badge** in `README.md` linking to the GitHub
@@ -37,6 +43,14 @@ project adheres to
   ~85%, argus-verify ~76%, argus-guard 68%. See
   `docs/coverage.md` for the full table and the
   commit-by-commit test additions.
+
+- **bestpractices.dev Silver 243%** — the project
+  carries an OpenSSF Best Practices Silver badge
+  (`https://www.bestpractices.dev/en/projects/13242`).
+  100% passing + 100% silver + 43% gold. The gold
+  percentage is the bonus from criteria that were
+  already Met before the coverage push (crypto,
+  documentation, governance, signed_releases).
 
 ### Fixed
 
