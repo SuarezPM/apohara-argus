@@ -88,7 +88,12 @@ serde_yaml = "0.9"
 # the fixed 0.103.x line). The 0.8 major bump carries the
 # same feature list and the same `query!` / `query_as!`
 # derive-macro surface the workspace already uses.
-sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "sqlite", "uuid", "chrono", "macros", "migrate"] }
+# `default-features = false` drops the `any` feature, which would
+# otherwise pull in sqlx-mysql + rsa 0.9.10 (RUSTSEC-2023-0071, Marvin
+# Attack timing sidechannel, unfixed). We only use SQLite + Postgres
+# explicitly, so `any` is dead weight and the source of the 1
+# unfixed vulnerability the OpenSSF Scorecard was flagging.
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "sqlite", "uuid", "chrono", "macros", "migrate", "json"] }
 
 # Templating (SSR for dashboard)
 askama = "0.12"

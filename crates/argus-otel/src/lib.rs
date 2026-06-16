@@ -37,8 +37,7 @@ pub struct TelemetryGuard {
 /// so tests can override without going through the process-global
 /// env table (which would need `unsafe` for `set_var` / `remove_var`
 /// on Rust ≥ 1.86, breaking our zero-`unsafe` invariant).
-static DISABLED_CACHE: std::sync::RwLock<Option<bool>> =
-    std::sync::RwLock::new(None);
+static DISABLED_CACHE: std::sync::RwLock<Option<bool>> = std::sync::RwLock::new(None);
 
 /// `true` when the user has explicitly disabled OTel for this run.
 /// The first call reads `ARGUS_OTEL_DISABLED` from the process env;
@@ -55,10 +54,7 @@ static DISABLED_CACHE: std::sync::RwLock<Option<bool>> =
 /// var is the source of truth, the lock is just a cache).
 pub fn is_disabled() -> bool {
     // Fast path: already cached.
-    if let Some(b) = *DISABLED_CACHE
-        .read()
-        .unwrap_or_else(|e| e.into_inner())
-    {
+    if let Some(b) = *DISABLED_CACHE.read().unwrap_or_else(|e| e.into_inner()) {
         return b;
     }
     // Cold path: compute the default from the env var and
