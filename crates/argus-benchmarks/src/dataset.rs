@@ -167,4 +167,177 @@ mod tests {
         assert_eq!(pr.ground_truth, Label::Slop);
         assert!(pr.notes.is_none());
     }
+
+    #[test]
+    fn label_returns_ground_truth() {
+        let pr_slop = LabeledPR {
+            id: "a".into(),
+            title: "t".into(),
+            diff: String::new(),
+            ground_truth: Label::Slop,
+            language: "rust".into(),
+            source: "synthetic".into(),
+            notes: None,
+        };
+        let pr_clean = LabeledPR {
+            ground_truth: Label::Clean,
+            ..pr_slop.clone()
+        };
+        assert_eq!(pr_slop.label(), Label::Slop);
+        assert_eq!(pr_clean.label(), Label::Clean);
+    }
+
+    #[test]
+    fn load_prs_jsonl_reads_multiple_lines() {
+        // The JSONL loader must skip blank lines and parse
+        // each non-blank line as a separate LabeledPR.
+        let dir = std::env::temp_dir().join("argus-bench-dataset-prs-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("prs.jsonl");
+        let content = "\
+{\"id\":\"a\",\"title\":\"t\",\"diff\":\"+ let x = 1;\",\"ground_truth\":\"slop\",\"language\":\"rust\",\"source\":\"synthetic\"}\n\
+\n\
+{\"id\":\"b\",\"title\":\"t2\",\"diff\":\"+ let y = 2;\",\"ground_truth\":\"clean\",\"language\":\"rust\",\"source\":\"real-pr\"}\n";
+        std::fs::write(&path, content).unwrap();
+        let prs = load_prs_jsonl(&path).expect("load ok");
+        assert_eq!(prs.len(), 2);
+        assert_eq!(prs[0].id, "a");
+        assert_eq!(prs[1].id, "b");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn load_prs_jsonl_errors_on_missing_file() {
+        let path = std::env::temp_dir().join("argus-bench-nonexistent-xyz.jsonl");
+        let _ = std::fs::remove_file(&path);
+        let res = load_prs_jsonl(&path);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn load_prs_jsonl_errors_on_invalid_json() {
+        // A line that is not valid JSON must produce a
+        // DatasetError::Json with the line number in the path.
+        let dir = std::env::temp_dir().join("argus-bench-dataset-invalid-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("prs.jsonl");
+        std::fs::write(&path, "not valid json\n").unwrap();
+        let res = load_prs_jsonl(&path);
+        match res {
+            Err(DatasetError::Json { path: p, .. }) => {
+                assert!(p.contains("line 1"));
+            }
+            other => panic!("expected DatasetError::Json, got {:?}", other),
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn load_labels_reads_json_map() {
+        // The labels.json file is a flat string→string map.
+        let dir = std::env::temp_dir().join("argus-bench-labels-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("labels.json");
+        std::fs::write(&path, r#"{"a":"slop","b":"clean"}"#).unwrap();
+        let labels = load_labels(&path).expect("load ok");
+        assert_eq!(labels.len(), 2);
+        assert_eq!(labels.get("a").map(|s| s.as_str()), Some("slop"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn load_labels_errors_on_invalid_json() {
+        let dir = std::env::temp_dir().join("argus-bench-labels-invalid-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("labels.json");
+        std::fs::write(&path, "not json").unwrap();
+        let res = load_labels(&path);
+        assert!(matches!(res, Err(DatasetError::Json { .. })));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn load_dataset_cross_check_succeeds_when_consistent() {
+        // When prs.jsonl and labels.json agree on every id,
+        // load_dataset returns Ok with both collections.
+        let dir = std::env::temp_dir().join("argus-bench-dataset-crosscheck-ok");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("prs.jsonl"),
+            "{\"id\":\"a\",\"title\":\"t\",\"diff\":\"+x\",\"ground_truth\":\"slop\",\"language\":\"rust\",\"source\":\"synthetic\"}\n",
+        ).unwrap();
+        std::fs::write(dir.join("labels.json"), r#"{"a":"slop"}"#).unwrap();
+        let (prs, labels) =
+            load_dataset(dir.join("prs.jsonl"), dir.join("labels.json")).expect("cross-check ok");
+        assert_eq!(prs.len(), 1);
+        assert_eq!(labels.len(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn load_dataset_cross_check_errors_on_label_mismatch() {
+        // prs.jsonl says id "a" is slop, labels.json says
+        // clean → LabelMismatch error.
+        let dir = std::env::temp_dir().join("argus-bench-dataset-mismatch");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("prs.jsonl"),
+            "{\"id\":\"a\",\"title\":\"t\",\"diff\":\"+x\",\"ground_truth\":\"slop\",\"language\":\"rust\",\"source\":\"synthetic\"}\n",
+        ).unwrap();
+        std::fs::write(dir.join("labels.json"), r#"{"a":"clean"}"#).unwrap();
+        let res = load_dataset(dir.join("prs.jsonl"), dir.join("labels.json"));
+        match res {
+            Err(DatasetError::LabelMismatch { id, label, gt }) => {
+                assert_eq!(id, "a");
+                assert_eq!(label, "clean");
+                assert!(gt.contains("Slop"));
+            }
+            other => panic!("expected LabelMismatch, got {:?}", other),
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn load_dataset_cross_check_errors_on_unknown_label() {
+        // labels.json contains a label string other than
+        // "slop" or "clean" → DatasetError::Json.
+        let dir = std::env::temp_dir().join("argus-bench-dataset-unknown-label");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("prs.jsonl"),
+            "{\"id\":\"a\",\"title\":\"t\",\"diff\":\"+x\",\"ground_truth\":\"slop\",\"language\":\"rust\",\"source\":\"synthetic\"}\n",
+        ).unwrap();
+        std::fs::write(dir.join("labels.json"), r#"{"a":"maybe"}"#).unwrap();
+        let res = load_dataset(dir.join("prs.jsonl"), dir.join("labels.json"));
+        assert!(matches!(res, Err(DatasetError::Json { .. })));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn load_dataset_allows_ids_only_in_prs() {
+        // If a PR id is in prs.jsonl but not in labels.json,
+        // the cross-check skips it (no error). This is by
+        // design — labels.json is a subset that cross-validates
+        // the PRs that ARE labeled.
+        let dir = std::env::temp_dir().join("argus-bench-dataset-prs-only");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("prs.jsonl"),
+            "{\"id\":\"a\",\"title\":\"t\",\"diff\":\"+x\",\"ground_truth\":\"slop\",\"language\":\"rust\",\"source\":\"synthetic\"}\n",
+        ).unwrap();
+        std::fs::write(dir.join("labels.json"), r#"{}"#).unwrap();
+        let (prs, labels) =
+            load_dataset(dir.join("prs.jsonl"), dir.join("labels.json")).expect("prs-only is ok");
+        assert_eq!(prs.len(), 1);
+        assert_eq!(labels.len(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

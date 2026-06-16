@@ -209,3 +209,177 @@ impl MockNimClient {
 // requests without depending on argus_llm directly.
 #[allow(unused_imports)]
 pub use argus_llm::Message as MockMessage;
+
+#[cfg(test)]
+mod tests {
+    //! The MockNimClient is the benchmark's LLM layer. It must
+    //! return deterministic, ground-truth-aligned responses for
+    //! every PR in the dataset. These tests pin that contract.
+
+    use super::*;
+    use crate::dataset::{Label, LabeledPR};
+    use argus_llm::Message;
+
+    fn make_pr(id: &str, diff: &str, label: Label) -> LabeledPR {
+        LabeledPR {
+            id: id.to_string(),
+            title: "test".into(),
+            diff: diff.to_string(),
+            ground_truth: label,
+            language: "rust".into(),
+            source: "synthetic".into(),
+            notes: None,
+        }
+    }
+
+    #[test]
+    fn provider_name_is_mock_nim() {
+        let prs = vec![make_pr("a", "diff-a", Label::Slop)];
+        let c = MockNimClient::new(&prs);
+        assert_eq!(c.provider_name(), "mock-nim");
+    }
+
+    #[test]
+    fn new_stores_all_prs() {
+        let prs = vec![
+            make_pr("a", "diff-a", Label::Slop),
+            make_pr("b", "diff-b", Label::Clean),
+        ];
+        let c = MockNimClient::new(&prs);
+        // Both diffs must be findable via lookup.
+        assert!(c.lookup("diff-a").is_some());
+        assert!(c.lookup("diff-b").is_some());
+        // A diff that wasn't in the dataset returns None.
+        assert!(c.lookup("not-in-dataset").is_none());
+    }
+
+    #[test]
+    fn lookup_finds_pr_by_diff_hash() {
+        let prs = vec![make_pr("unique-id-1", "unique-diff-content", Label::Slop)];
+        let c = MockNimClient::new(&prs);
+        let found = c.lookup("unique-diff-content").expect("should find");
+        assert_eq!(found.id, "unique-id-1");
+        assert_eq!(found.ground_truth, Label::Slop);
+    }
+
+    #[test]
+    fn lookup_returns_none_for_unknown_diff() {
+        let prs = vec![make_pr("a", "diff-a", Label::Slop)];
+        let c = MockNimClient::new(&prs);
+        assert!(c.lookup("completely-different-content").is_none());
+    }
+
+    #[tokio::test]
+    async fn complete_with_slop_label_returns_review_required() {
+        // The slop branch emits a verdict-synthesizer-shaped
+        // payload with verdict=REVIEW_REQUIRED and risk_score=0.85.
+        let prs = vec![make_pr("slop-1", "slop-diff", Label::Slop)];
+        let c = MockNimClient::new(&prs);
+        let req = CompletionRequest::new("m", vec![Message::user("slop-diff")]);
+        let resp = c.complete(req, "").await.expect("complete ok");
+        assert!(resp.content.contains("REVIEW_REQUIRED"));
+        assert!(resp.content.contains("0.85"));
+        assert!(resp.content.contains("slop-1"));
+        assert_eq!(resp.model, "mock-nim-v1");
+        // Token accounting: prompt_tokens = len(prompt_text)/4.
+        assert!(resp.usage.prompt_tokens > 0);
+        assert_eq!(
+            resp.usage.total_tokens,
+            resp.usage.prompt_tokens + resp.usage.completion_tokens
+        );
+    }
+
+    #[tokio::test]
+    async fn complete_with_clean_label_returns_approve() {
+        // The clean branch emits verdict=APPROVE and risk_score=0.10.
+        let prs = vec![make_pr("clean-1", "clean-diff", Label::Clean)];
+        let c = MockNimClient::new(&prs);
+        let req = CompletionRequest::new("m", vec![Message::user("clean-diff")]);
+        let resp = c.complete(req, "").await.expect("complete ok");
+        assert!(resp.content.contains("APPROVE"));
+        // JSON serializes 0.10 as 0.1 (trailing zero dropped).
+        assert!(resp.content.contains("0.1"));
+        assert!(resp.content.contains("clean-1"));
+    }
+
+    #[tokio::test]
+    async fn complete_with_unknown_user_msg_returns_unknown_verdict() {
+        // When the user message is not in the dataset, the
+        // mock returns a polite "unknown" verdict (verdict=
+        // UNKNOWN, risk_score=0.0). This is the bench's
+        // "lookup miss" path.
+        let prs = vec![make_pr("a", "diff-a", Label::Slop)];
+        let c = MockNimClient::new(&prs);
+        let req = CompletionRequest::new("m", vec![Message::user("never-seen-before")]);
+        let resp = c.complete(req, "").await.expect("complete ok");
+        assert!(resp.content.contains("UNKNOWN"));
+        assert!(resp.content.contains("0.0"));
+        assert!(resp.content.contains("not in labeled dataset"));
+    }
+
+    #[tokio::test]
+    async fn complete_with_no_user_messages_returns_unknown() {
+        // No user messages → last_user is empty → lookup with ""
+        // → miss → UNKNOWN verdict. The unwrap_or_default() path
+        // in the iterator.
+        let prs = vec![make_pr("a", "diff-a", Label::Slop)];
+        let c = MockNimClient::new(&prs);
+        let req = CompletionRequest::new("m", vec![Message::system("sys only")]);
+        let resp = c.complete(req, "").await.expect("complete ok");
+        assert!(resp.content.contains("UNKNOWN"));
+    }
+
+    #[tokio::test]
+    async fn complete_uses_last_user_message() {
+        // The mock searches .iter().rev().find() for the last
+        // User message. A later User message must override an
+        // earlier one.
+        let prs = vec![make_pr("a", "first-diff", Label::Slop)];
+        let c = MockNimClient::new(&prs);
+        let req = CompletionRequest::new(
+            "m",
+            vec![
+                Message::user("first-diff"),
+                Message::assistant("ok"),
+                Message::user("second-diff-not-in-dataset"),
+            ],
+        );
+        let resp = c.complete(req, "").await.expect("complete ok");
+        // The last user message is not in the dataset → UNKNOWN.
+        assert!(resp.content.contains("UNKNOWN"));
+    }
+
+    #[test]
+    fn estimate_tokens_sync_slop_label() {
+        let prs = vec![make_pr("a", "diff-a", Label::Slop)];
+        let c = MockNimClient::new(&prs);
+        let usage = c.estimate_tokens_sync("system prompt", "diff-a");
+        // prompt = "[system] system prompt\n[user] diff-a" → ~28 chars
+        assert!(usage.prompt_tokens > 0);
+        // completion is the slop JSON, ~80+ chars
+        assert!(usage.completion_tokens > 0);
+        assert_eq!(
+            usage.total_tokens,
+            usage.prompt_tokens + usage.completion_tokens
+        );
+    }
+
+    #[test]
+    fn estimate_tokens_sync_clean_label() {
+        let prs = vec![make_pr("a", "diff-a", Label::Clean)];
+        let c = MockNimClient::new(&prs);
+        let usage = c.estimate_tokens_sync("sys", "diff-a");
+        assert!(usage.prompt_tokens > 0);
+        assert!(usage.completion_tokens > 0);
+    }
+
+    #[test]
+    fn estimate_tokens_sync_unknown_diff() {
+        let prs = vec![make_pr("a", "diff-a", Label::Slop)];
+        let c = MockNimClient::new(&prs);
+        let usage = c.estimate_tokens_sync("sys", "not-in-dataset");
+        // Lookup miss → UNKNOWN verdict, same accounting shape.
+        assert!(usage.prompt_tokens > 0);
+        assert!(usage.completion_tokens > 0);
+    }
+}
