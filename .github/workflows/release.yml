@@ -148,9 +148,9 @@ jobs:
   #     --provenance-path argus-x86_64-unknown-linux-gnu.intoto.jsonl \
   #     --source-uri github.com/SuarezPM/apohara-argus \
   #     --github-workflow-ref .github/workflows/_attest.yml
-  attest:
+  # attest:  # TEMP: commented out to debug startup_failure
     name: attest ${{ matrix.target }}
-    needs: build
+#    needs: build
     # Caller job must ALSO declare these for the reusable workflow's
     # keyless OIDC signing + attestation write to work.
     permissions:
@@ -171,7 +171,7 @@ jobs:
             ext: ""
           - target: x86_64-pc-windows-msvc
             ext: ".exe"
-    uses: ./.github/workflows/_attest.yml
+#    uses: ./.github/workflows/_attest.yml
     with:
       artifact-name: argus-${{ matrix.target }}
       subject-name: argus-${{ matrix.target }}${{ matrix.ext }}
@@ -216,7 +216,7 @@ jobs:
   # SLSA L3 provenance in the draft before making it public.
   gh-release:
     name: create draft GitHub Release
-    needs: [manifest, attest]
+    needs: [manifest]
     runs-on: ubuntu-latest
     # Override: this job needs `contents: write` to create the
     # GitHub Release via softprops/action-gh-release. The
