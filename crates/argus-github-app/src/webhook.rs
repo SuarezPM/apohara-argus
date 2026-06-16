@@ -41,7 +41,6 @@ const ACTIONS: &[&str] = &["opened", "synchronize", "reopened"];
 /// distinguish `Approved` from `Halted` (that's the LLM's
 /// job), so we use a single "ran-and-found-nothing" label
 /// when the LLM is absent.
-#[allow(dead_code)]
 const LABEL_DETERMINISTIC_ONLY: &str = "argus/reviewed";
 
 /// A flattened summary of the deterministic slop run, ready to
@@ -53,7 +52,6 @@ struct SlopSummary {
     error_count: usize,
     warning_count: usize,
     info_count: usize,
-    #[allow(dead_code)]
     bullets: Vec<String>,
     body: String,
 }

@@ -191,13 +191,6 @@ pre-built install URL. See https://github.com/SuarezPM/apohara-argus
 for full documentation.
 ";
 
-/// We do not actually need `AppState` in the setup route, but
-/// we accept it so future config-driven customization (e.g.,
-/// env-overridden `name` or `homepage`) doesn't break the
-/// route signature.
-#[allow(dead_code)]
-fn _state_proof(_s: AppState) {}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1223,7 +1223,6 @@ fn render_landing(samples_html: &str) -> String {
 /// Build a HeyGen Studio deeplink from the briefing text. The user pastes
 /// it into their own HeyGen account — no server-side call, no vendor
 /// dependency, no API key needed. Honors our BYOK philosophy.
-#[allow(dead_code)]
 fn heygen_deeplink(script: &str) -> String {
     // HeyGen's Studio accepts a `script` query param pre-filled with text.
     // The user clicks → lands in their HeyGen account → records/renders.
@@ -1235,7 +1234,6 @@ fn heygen_deeplink(script: &str) -> String {
 
 /// Minimal percent-encoding for the HeyGen deeplink query string.
 /// Keeps spaces and safe chars readable, escapes the rest.
-#[allow(dead_code)]
 fn url_encode(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for b in s.bytes() {
