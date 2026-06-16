@@ -108,6 +108,13 @@ mod tests {
 
     #[test]
     fn retention_days_default_and_env_override() {
+        // Acquire the ENV_LOCK to serialize with the other
+        // env-touching tests in this module (added later). Without
+        // the lock, a concurrent test setting ARGUS_RETENTION_DAYS
+        // to a non-365 value would race with this test's
+        // `remove_var` + `from_env` sequence and produce a flaky
+        // failure.
+        let _guard = ENV_LOCK.lock().unwrap();
         // Default: 365 when env not set.
         let prev = std::env::var("ARGUS_RETENTION_DAYS").ok();
         std::env::remove_var("ARGUS_RETENTION_DAYS");

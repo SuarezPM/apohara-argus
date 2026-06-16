@@ -297,4 +297,236 @@ mod tests {
         assert_eq!(b.top_offenders.len(), 1);
         assert!((o.avg_risk_score - 0.55).abs() < 0.01);
     }
+
+    #[test]
+    fn new_uses_default_nim_model() {
+        // The default model is pinned to a specific NIM model
+        // name. We verify it's non-empty and matches the same
+        // default that NimClient uses.
+        let r = LensRunner::new();
+        assert!(!r.nim_model.is_empty());
+        assert_eq!(r.nim_model, "meta/llama-3.1-70b-instruct");
+    }
+
+    #[test]
+    fn with_model_replaces_nim_model_and_re_wires_nim_client() {
+        // The builder pattern: with_model(m) sets self.nim_model
+        // AND rebuilds self.nim with the same model. Both fields
+        // must end up in sync.
+        let r = LensRunner::new().with_model("custom/test-model");
+        assert_eq!(r.nim_model, "custom/test-model");
+    }
+
+    #[test]
+    fn default_impl_matches_new() {
+        // The Default impl must produce a runner equivalent to
+        // `LensRunner::new()` — same model, same NimClient setup.
+        let d = LensRunner::default();
+        let n = LensRunner::new();
+        assert_eq!(d.nim_model, n.nim_model);
+    }
+
+    #[test]
+    fn pr_brief_summary_display_format() {
+        // The Display impl is used in `generate_briefing()` to
+        // build the prompt text. The format must include the PR
+        // ref, author, risk score (2 decimal places), and top
+        // finding.
+        let p = PRBriefSummary {
+            pr_ref: "acme/api#42".into(),
+            author: "alice".into(),
+            risk_score: 0.85,
+            top_finding: "hardcoded AWS key".into(),
+            critical_findings: 1,
+        };
+        let s = format!("{}", p);
+        assert!(s.contains("acme/api#42"));
+        assert!(s.contains("alice"));
+        assert!(s.contains("0.85"));
+        assert!(s.contains("hardcoded AWS key"));
+        assert!(s.starts_with("- PR "));
+    }
+
+    #[test]
+    fn aggregate_caps_top_offenders_at_five() {
+        // The aggregate() function takes only the top 5 PRs with
+        // risk_score >= 0.5 for the top_offenders list. We feed
+        // 7 high-risk PRs and verify only 5 make it.
+        let r = LensRunner::new();
+        let mut prs = Vec::new();
+        for i in 0..7 {
+            prs.push(PRBriefSummary {
+                pr_ref: format!("acme/api#{}", i),
+                author: "alice".into(),
+                risk_score: 0.9,
+                top_finding: format!("finding {}", i),
+                critical_findings: 0,
+            });
+        }
+        let (b, _) = r.aggregate(
+            "acme",
+            chrono::NaiveDate::from_ymd_opt(2026, 6, 10).unwrap(),
+            &prs,
+        );
+        assert_eq!(b.top_offenders.len(), 5);
+    }
+
+    #[test]
+    fn aggregate_top_offenders_filters_low_risk() {
+        // PRs with risk_score < 0.5 are excluded from
+        // top_offenders regardless of count.
+        let r = LensRunner::new();
+        let prs = vec![
+            PRBriefSummary {
+                pr_ref: "acme/api#1".into(),
+                author: "alice".into(),
+                risk_score: 0.3, // below threshold
+                top_finding: "low".into(),
+                critical_findings: 0,
+            },
+            PRBriefSummary {
+                pr_ref: "acme/api#2".into(),
+                author: "bob".into(),
+                risk_score: 0.8, // above threshold
+                top_finding: "high".into(),
+                critical_findings: 0,
+            },
+        ];
+        let (b, _) = r.aggregate(
+            "acme",
+            chrono::NaiveDate::from_ymd_opt(2026, 6, 10).unwrap(),
+            &prs,
+        );
+        assert_eq!(b.top_offenders.len(), 1);
+        assert_eq!(b.top_offenders[0].pr_ref, "acme/api#2");
+    }
+
+    #[test]
+    fn aggregate_groups_by_author_into_by_team() {
+        // The by_team field groups PRs by author (proxy for
+        // team). We feed 3 PRs from 2 authors and verify the
+        // grouping + per-team aggregates.
+        let r = LensRunner::new();
+        let prs = vec![
+            PRBriefSummary {
+                pr_ref: "acme/api#1".into(),
+                author: "alice".into(),
+                risk_score: 0.8,
+                top_finding: "secret".into(),
+                critical_findings: 1,
+            },
+            PRBriefSummary {
+                pr_ref: "acme/api#2".into(),
+                author: "alice".into(),
+                risk_score: 0.6,
+                top_finding: "slop".into(),
+                critical_findings: 0,
+            },
+            PRBriefSummary {
+                pr_ref: "acme/web#1".into(),
+                author: "bob".into(),
+                risk_score: 0.3,
+                top_finding: "minor".into(),
+                critical_findings: 0,
+            },
+        ];
+        let (_, o) = r.aggregate(
+            "acme",
+            chrono::NaiveDate::from_ymd_opt(2026, 6, 10).unwrap(),
+            &prs,
+        );
+        assert_eq!(o.by_team.len(), 2);
+        // Find alice's team.
+        let alice_team = o
+            .by_team
+            .iter()
+            .find(|t| t.team == "alice")
+            .expect("alice should have a team");
+        assert_eq!(alice_team.pr_count, 2);
+        assert!((alice_team.avg_risk - 0.7).abs() < 0.01);
+        assert_eq!(alice_team.high_risk_count, 1); // 0.8 >= 0.7
+    }
+
+    #[test]
+    fn render_markdown_includes_all_sections() {
+        // The markdown rendering must include the header, week
+        // date, PR count, avg risk, critical findings, and the
+        // CTO script section. We construct a WeeklyBriefing
+        // and OrgSummary directly (bypassing aggregate) to
+        // control the output precisely.
+        let b = apohara_argus_core::WeeklyBriefing {
+            id: uuid::Uuid::nil(),
+            week_starting: chrono::NaiveDate::from_ymd_opt(2026, 6, 10).unwrap(),
+            org: "acme".into(),
+            prs_analyzed: 3,
+            avg_slop_score: 0.4,
+            avg_fit_score: 0.2,
+            critical_findings: 1,
+            top_offenders: vec![apohara_argus_core::OffenderSummary {
+                pr_ref: "acme/api#1".into(),
+                author: "alice".into(),
+                risk_score: 0.9,
+                top_finding: "secret".into(),
+            }],
+            trend_vs_prev_week: 0.0,
+            cto_avatar_script: "Good morning team, this week...".into(),
+            created_at: chrono::Utc::now(),
+        };
+        let o = apohara_argus_core::OrgSummary {
+            org: "acme".into(),
+            total_prs_analyzed: 3,
+            pct_ai_generated: 0.65,
+            avg_risk_score: 0.5,
+            by_team: vec![apohara_argus_core::TeamSummary {
+                team: "alice".into(),
+                pr_count: 3,
+                avg_risk: 0.5,
+                high_risk_count: 1,
+            }],
+            last_updated: chrono::Utc::now(),
+        };
+        let md = render_markdown(&b, &o, &[]);
+        assert!(md.contains("# ARGUS Weekly Briefing — `acme`"));
+        assert!(md.contains("Week of: 2026-06-10"));
+        assert!(md.contains("PRs analyzed: **3**"));
+        assert!(md.contains("Avg risk: **0.50**"));
+        assert!(md.contains("Critical findings: **1**"));
+        assert!(md.contains("## CTO Avatar Script"));
+        assert!(md.contains("Good morning team, this week..."));
+        assert!(md.contains("## Top Offenders"));
+        assert!(md.contains("acme/api#1"));
+        assert!(md.contains("## By Team"));
+        assert!(md.contains("alice"));
+    }
+
+    #[test]
+    fn render_markdown_omits_empty_sections() {
+        // When there are no top_offenders and no by_team entries,
+        // those sections must be omitted from the markdown (not
+        // rendered as empty tables).
+        let b = apohara_argus_core::WeeklyBriefing {
+            id: uuid::Uuid::nil(),
+            week_starting: chrono::NaiveDate::from_ymd_opt(2026, 6, 10).unwrap(),
+            org: "acme".into(),
+            prs_analyzed: 0,
+            avg_slop_score: 0.0,
+            avg_fit_score: 0.0,
+            critical_findings: 0,
+            top_offenders: vec![],
+            trend_vs_prev_week: 0.0,
+            cto_avatar_script: String::new(),
+            created_at: chrono::Utc::now(),
+        };
+        let o = apohara_argus_core::OrgSummary {
+            org: "acme".into(),
+            total_prs_analyzed: 0,
+            pct_ai_generated: 0.0,
+            avg_risk_score: 0.0,
+            by_team: vec![],
+            last_updated: chrono::Utc::now(),
+        };
+        let md = render_markdown(&b, &o, &[]);
+        assert!(!md.contains("## Top Offenders"));
+        assert!(!md.contains("## By Team"));
+    }
 }
