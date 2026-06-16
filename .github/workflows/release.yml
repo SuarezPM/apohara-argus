@@ -21,8 +21,13 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+# OpenSSF Scorecard: Token-Permissions (10/10). Top-level is the
+# strictest minimum (`contents: read`); jobs that need write scope
+# (gh-release creating the GitHub Release, attest writing the
+# SLSA L3 provenance) override per-job. This pattern is the
+# scorecard-recommended way to keep the GITHUB_TOKEN least-privilege.
 permissions:
-  contents: write  # required for gh-release job (creates GitHub Releases)
+  contents: read
 
 jobs:
   third-party-licenses:
@@ -213,6 +218,13 @@ jobs:
     name: create draft GitHub Release
     needs: [manifest, attest]
     runs-on: ubuntu-latest
+    # Override: this job needs `contents: write` to create the
+    # GitHub Release via softprops/action-gh-release. The
+    # `attest` job needs `id-token: write` + `attestations: write`
+    # (declared inline above). All other jobs inherit
+    # `contents: read` from the workflow top level.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
