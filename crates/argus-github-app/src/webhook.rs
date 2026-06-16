@@ -121,7 +121,10 @@ pub async fn webhook_handler(
 /// would add an allocation on every error path for no real win
 /// (error paths are cold). The Ok path stays zero-cost.
 #[allow(clippy::result_large_err)]
-fn check_payload_size(cordon: &CordonEnforcer, body: &Bytes) -> Result<(), axum::response::Response> {
+fn check_payload_size(
+    cordon: &CordonEnforcer,
+    body: &Bytes,
+) -> Result<(), axum::response::Response> {
     if let Err(err) = cordon.check_size(body) {
         warn!(error = %err, "webhook payload too large");
         Err((StatusCode::PAYLOAD_TOO_LARGE, err.to_string()).into_response())
@@ -144,11 +147,7 @@ fn check_signature(
         .get("x-hub-signature-256")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
-    if let Err(err) = signature::verify(
-        state.config.webhook_secret.as_bytes(),
-        sig_header,
-        body,
-    ) {
+    if let Err(err) = signature::verify(state.config.webhook_secret.as_bytes(), sig_header, body) {
         warn!(error = %err, "webhook signature verification failed");
         Err((StatusCode::UNAUTHORIZED, "invalid signature".to_string()).into_response())
     } else {
@@ -275,8 +274,25 @@ async fn handle_pr_event(
 
     let (label_slug, comment_body) = compose_verdict(&config, &payload, &slop);
 
-    post_verdict_comment(&gh, owner, repo, number, &payload.repository.full_name, &comment_body).await;
-    set_verdict_label(&gh, &config, label_slug, owner, repo, number, &payload.repository.full_name).await;
+    post_verdict_comment(
+        &gh,
+        owner,
+        repo,
+        number,
+        &payload.repository.full_name,
+        &comment_body,
+    )
+    .await;
+    set_verdict_label(
+        &gh,
+        &config,
+        label_slug,
+        owner,
+        repo,
+        number,
+        &payload.repository.full_name,
+    )
+    .await;
 
     // Emit an audit-friendly log line. The full
     // argus-verify audit chain (BLAKE3 + Ed25519) is
