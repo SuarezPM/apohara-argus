@@ -44,7 +44,7 @@ project adheres to
   `required_conversation_resolution: true`,
   `allow_force_pushes: false`, `allow_deletions: false`,
   `required_status_checks: 7` — the full 7-job CI gate)
-  with a ruleset (ID `17755784`, `main-protection`,
+  with a ruleset (ID `17758566`, `main-protection`,
   `enforcement: active`, targeting `refs/heads/main`)
   carrying 3 active rules: `deletion`, `non_fast_forward`,
   `required_linear_history`. The scorecard's
@@ -58,6 +58,20 @@ project adheres to
   and the only solution was `PUT` with the complete body
   including `required_status_checks` (empty fails with
   422 "weren't supplied") and `restrictions: null`.
+
+- **aislop workflow `Comment on PR` step failure fixed**:
+  The `peter-evans/create-or-update-comment` action in
+  the `Comment on PR` step needs `pull-requests: write`
+  to post comments on PRs. Without it, the step fails
+  with "Resource not accessible by integration" on every
+  PR run, which was blocking the merge of valid PRs
+  (PRs #12 and #14 in this repo both failed to merge
+  because of this). The `pull-requests: write` scope
+  is narrowly scoped to PR comments only — it does not
+  grant merge, push, or admin access. The Scorecard
+  `Token-Permissions` check (10/10) is preserved because
+  the scope is only used by the comment step, not by
+  the scan/upload steps.
 
 ## [0.1.0] - 2026-06-16
 
