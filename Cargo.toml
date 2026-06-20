@@ -186,7 +186,7 @@ rand = "0.8"
 # Versions pinned to the ones already resolved transitively in
 # Cargo.lock (subtle 2.6, hmac 0.12, sha2 0.10) so adding this
 # crate introduces no new resolution work.
-hmac = "0.12"
+hmac = "0.13"
 sha2 = "0.10"
 subtle = "2"
 
