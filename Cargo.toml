@@ -179,7 +179,7 @@ dotenvy = "0.15"
 url = "2"
 base64 = "0.22"
 hex = "0.4"
-rand = "0.8"
+rand = "0.9"
 
 # HMAC + SHA-256 for GitHub App webhook signature verification.
 # `subtle` provides constant-time comparison (timing-attack defense).

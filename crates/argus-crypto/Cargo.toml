@@ -13,7 +13,7 @@ repository.workspace = true
 [dependencies]
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 blake3 = "1"
-rand = "0.8"
+rand = "0.9"
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
