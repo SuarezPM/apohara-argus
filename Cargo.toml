@@ -187,7 +187,7 @@ rand = "0.8"
 # Cargo.lock (subtle 2.6, hmac 0.12, sha2 0.10) so adding this
 # crate introduces no new resolution work.
 hmac = "0.12"
-sha2 = "0.10"
+sha2 = "0.11"
 subtle = "2"
 
 # Markdown parsing (para los prompts .md)
